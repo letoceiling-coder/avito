@@ -51,17 +51,27 @@ class DeployController extends Controller
             $log[] = "Шаг 1: Обновление кода из git...";
             
             // Проверяем, является ли директория git репозиторием
-            if (!is_dir('.git')) {
+            $gitDir = getcwd() . '/.git';
+            $log[] = "Проверка git репозитория в: " . getcwd();
+            $log[] = "Путь к .git: {$gitDir}";
+            
+            if (!is_dir('.git') && !is_dir($gitDir)) {
                 $log[] = "Предупреждение: Директория не является git репозиторием";
                 $log[] = "Пропуск обновления из git";
             } else {
+                $log[] = "Git репозиторий найден, выполняется обновление...";
                 $gitPull = $this->executeCommand('git pull origin master 2>&1', $log);
                 if ($gitPull['code'] !== 0) {
                     // Попробуем ветку main
+                    $log[] = "Попытка обновления из ветки main...";
                     $gitPull = $this->executeCommand('git pull origin main 2>&1', $log);
                     if ($gitPull['code'] !== 0) {
                         $log[] = "Предупреждение: Не удалось обновить код из git (возможно, нет изменений или проблемы с подключением)";
+                    } else {
+                        $log[] = "Код успешно обновлен из ветки main";
                     }
+                } else {
+                    $log[] = "Код успешно обновлен из ветки master";
                 }
             }
             $log[] = "";
@@ -152,19 +162,44 @@ class DeployController extends Controller
             // Используем относительные пути, так как мы уже в корне проекта
             $currentDir = getcwd();
             $log[] = "Текущая директория: {$currentDir}";
+            $log[] = "Содержимое директории: " . implode(', ', array_slice(scandir('.'), 0, 10));
             
-            if (is_dir('storage')) {
+            // Проверяем storage
+            $storagePath = 'storage';
+            $storageAbsPath = $currentDir . '/' . $storagePath;
+            $log[] = "Проверка storage: относительный путь '{$storagePath}', абсолютный '{$storageAbsPath}'";
+            $log[] = "is_dir('storage'): " . (is_dir('storage') ? 'true' : 'false');
+            $log[] = "is_dir('{$storageAbsPath}'): " . (is_dir($storageAbsPath) ? 'true' : 'false');
+            
+            if (is_dir('storage') || is_dir($storageAbsPath)) {
                 $this->executeCommand("chmod -R 755 storage 2>&1", $log);
                 $log[] = "Права для storage установлены";
             } else {
-                $log[] = "Предупреждение: директория storage не найдена в {$currentDir}";
+                $log[] = "Предупреждение: директория storage не найдена";
+                $log[] = "Попытка создать директорию storage...";
+                @mkdir('storage', 0755, true);
+                if (is_dir('storage')) {
+                    $log[] = "Директория storage создана";
+                }
             }
             
-            if (is_dir('bootstrap/cache')) {
+            // Проверяем bootstrap/cache
+            $cachePath = 'bootstrap/cache';
+            $cacheAbsPath = $currentDir . '/' . $cachePath;
+            $log[] = "Проверка bootstrap/cache: относительный путь '{$cachePath}', абсолютный '{$cacheAbsPath}'";
+            $log[] = "is_dir('bootstrap/cache'): " . (is_dir('bootstrap/cache') ? 'true' : 'false');
+            $log[] = "is_dir('{$cacheAbsPath}'): " . (is_dir($cacheAbsPath) ? 'true' : 'false');
+            
+            if (is_dir('bootstrap/cache') || is_dir($cacheAbsPath)) {
                 $this->executeCommand("chmod -R 755 bootstrap/cache 2>&1", $log);
                 $log[] = "Права для bootstrap/cache установлены";
             } else {
-                $log[] = "Предупреждение: директория bootstrap/cache не найдена в {$currentDir}";
+                $log[] = "Предупреждение: директория bootstrap/cache не найдена";
+                $log[] = "Попытка создать директорию bootstrap/cache...";
+                @mkdir('bootstrap/cache', 0755, true);
+                if (is_dir('bootstrap/cache')) {
+                    $log[] = "Директория bootstrap/cache создана";
+                }
             }
             
             $log[] = "";
@@ -244,20 +279,27 @@ class DeployController extends Controller
     private function findComposer()
     {
         // Получаем домашнюю директорию пользователя
-        $homeDir = getenv('HOME') ?: (getenv('HOMEDRIVE') . getenv('HOMEPATH'));
+        $homeDir = getenv('HOME');
+        if (!$homeDir) {
+            // Для Windows
+            $homeDir = getenv('HOMEDRIVE') . getenv('HOMEPATH');
+        }
+        
+        // Получаем пользователя, который запускает PHP
         $user = get_current_user();
         
         // Проверяем различные возможные пути
-        $paths = [
-            'composer', // Глобальный composer
-        ];
+        $paths = [];
         
-        // Добавляем пути с домашней директорией
-        if ($homeDir) {
+        // Сначала проверяем домашнюю директорию пользователя
+        if ($homeDir && file_exists($homeDir . '/composer.phar')) {
             $paths[] = 'php ' . $homeDir . '/composer.phar';
         }
         
-        // Добавляем стандартные пути
+        // Проверяем глобальный composer
+        $paths[] = 'composer';
+        
+        // Проверяем стандартные пути
         $paths = array_merge($paths, [
             'php ~/composer.phar', // В домашней директории (через ~)
             'php composer.phar', // В текущей директории
@@ -275,17 +317,26 @@ class DeployController extends Controller
             if ($this->commandExists($checkCommand)) {
                 // Если это путь с файлом, проверяем существование файла
                 if (count($commandParts) > 1 && strpos($path, 'composer.phar') !== false) {
-                    $filePath = str_replace(['php ', '~/'], [$homeDir . '/', $homeDir . '/'], $path);
+                    // Заменяем ~ на реальный путь
+                    $filePath = str_replace('~/', $homeDir . '/', $path);
                     $filePath = preg_replace('/^php\s+/', '', $filePath);
-                    $filePath = str_replace('~/', $homeDir . '/', $filePath);
                     
-                    if (file_exists($filePath) || file_exists(str_replace($homeDir . '/', '', $filePath))) {
+                    if (file_exists($filePath)) {
                         return $path;
                     }
                 } else {
-                    return $path;
+                    // Для простых команд проверяем, что они работают
+                    $testResult = $this->executeCommand("{$path} --version 2>&1", $dummy);
+                    if ($testResult['code'] === 0) {
+                        return $path;
+                    }
                 }
             }
+        }
+
+        // Последняя попытка - проверим через exec напрямую
+        if ($homeDir && file_exists($homeDir . '/composer.phar')) {
+            return 'php ' . $homeDir . '/composer.phar';
         }
 
         return 'composer'; // По умолчанию (может не работать, но попробуем)
