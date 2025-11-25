@@ -324,6 +324,12 @@ class AvitoAdsController extends Controller
         $categoryId = $request->input('category_id');
         $result = $this->avitoApiService->getServiceCategories($integration, $categoryId);
 
+        \Log::info('Avito API: getCategories controller response', [
+            'success' => $result['success'],
+            'has_data' => isset($result['data']),
+            'error' => $result['error'] ?? null,
+        ]);
+
         return response()->json($result, $result['success'] ? 200 : 400);
     }
 
@@ -345,6 +351,12 @@ class AvitoAdsController extends Controller
 
         $query = $request->input('q');
         $result = $this->avitoApiService->getLocations($integration, $query);
+
+        \Log::info('Avito API: getLocations controller response', [
+            'success' => $result['success'],
+            'has_data' => isset($result['data']),
+            'error' => $result['error'] ?? null,
+        ]);
 
         return response()->json($result, $result['success'] ? 200 : 400);
     }

@@ -326,21 +326,51 @@ export default {
         async loadCategories() {
             try {
                 const response = await axios.get('/api/avito/categories');
+                console.log('Categories response:', response.data);
                 if (response.data.success) {
-                    this.categories = response.data.data.categories || [];
+                    // Структура ответа может быть разной, проверяем разные варианты
+                    const data = response.data.data || {};
+                    this.categories = data.categories || data.data || data.result || [];
+                    
+                    // Если категории в плоском виде, преобразуем
+                    if (Array.isArray(data) && !this.categories.length) {
+                        this.categories = data;
+                    }
+                    
+                    console.log('Loaded categories:', this.categories);
+                } else {
+                    console.error('Failed to load categories:', response.data.error);
                 }
             } catch (error) {
                 console.error('Error loading categories:', error);
+                if (error.response) {
+                    console.error('Response data:', error.response.data);
+                }
             }
         },
         async loadLocations() {
             try {
                 const response = await axios.get('/api/avito/locations');
+                console.log('Locations response:', response.data);
                 if (response.data.success) {
-                    this.locations = response.data.data.locations || [];
+                    // Структура ответа может быть разной, проверяем разные варианты
+                    const data = response.data.data || {};
+                    this.locations = data.locations || data.data || data.result || [];
+                    
+                    // Если локации в плоском виде, преобразуем
+                    if (Array.isArray(data) && !this.locations.length) {
+                        this.locations = data;
+                    }
+                    
+                    console.log('Loaded locations:', this.locations);
+                } else {
+                    console.error('Failed to load locations:', response.data.error);
                 }
             } catch (error) {
                 console.error('Error loading locations:', error);
+                if (error.response) {
+                    console.error('Response data:', error.response.data);
+                }
             }
         },
         async loadGeneratedAds() {

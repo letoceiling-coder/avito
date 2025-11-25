@@ -385,20 +385,50 @@ class AvitoApiService
                 $url .= "/{$categoryId}/attributes";
             }
 
+            Log::info('Avito API: Getting categories', [
+                'url' => $url,
+                'category_id' => $categoryId,
+                'integration_id' => $integration->id,
+            ]);
+
             $response = $client->get($url);
 
+            Log::info('Avito API: Categories response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+            ]);
+
             if ($response->successful()) {
+                $data = $response->json();
+                Log::info('Avito API: Categories data structure', [
+                    'keys' => is_array($data) ? array_keys($data) : 'not_array',
+                    'has_categories' => isset($data['categories']),
+                ]);
                 return [
                     'success' => true,
-                    'data' => $response->json(),
+                    'data' => $data,
                 ];
             }
 
+            $errorData = $response->json();
+            $errorMessage = $errorData['error']['message'] ?? $errorData['message'] ?? 'Ошибка получения категорий';
+            
+            Log::error('Avito API: Error getting categories', [
+                'status' => $response->status(),
+                'error' => $errorMessage,
+                'response' => $errorData,
+            ]);
+
             return [
                 'success' => false,
-                'error' => $response->json()['error']['message'] ?? 'Ошибка получения категорий',
+                'error' => $errorMessage,
+                'details' => $errorData,
             ];
         } catch (Exception $e) {
+            Log::error('Avito API: Exception getting categories', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
@@ -419,20 +449,52 @@ class AvitoApiService
                 $params['q'] = $query;
             }
 
-            $response = $client->get(self::BASE_URL . '/core/v1/locations', $params);
+            $url = self::BASE_URL . '/core/v1/locations';
+            
+            Log::info('Avito API: Getting locations', [
+                'url' => $url,
+                'params' => $params,
+                'integration_id' => $integration->id,
+            ]);
+
+            $response = $client->get($url, $params);
+
+            Log::info('Avito API: Locations response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+            ]);
 
             if ($response->successful()) {
+                $data = $response->json();
+                Log::info('Avito API: Locations data structure', [
+                    'keys' => is_array($data) ? array_keys($data) : 'not_array',
+                    'has_locations' => isset($data['locations']),
+                ]);
                 return [
                     'success' => true,
-                    'data' => $response->json(),
+                    'data' => $data,
                 ];
             }
 
+            $errorData = $response->json();
+            $errorMessage = $errorData['error']['message'] ?? $errorData['message'] ?? 'Ошибка получения городов';
+            
+            Log::error('Avito API: Error getting locations', [
+                'status' => $response->status(),
+                'error' => $errorMessage,
+                'response' => $errorData,
+            ]);
+
             return [
                 'success' => false,
-                'error' => $response->json()['error']['message'] ?? 'Ошибка получения городов',
+                'error' => $errorMessage,
+                'details' => $errorData,
             ];
         } catch (Exception $e) {
+            Log::error('Avito API: Exception getting locations', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
