@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\AvitoIntegrationController;
 use App\Http\Controllers\Api\AvitoAdsController;
 use App\Http\Controllers\Api\v1\FolderController;
 use App\Http\Controllers\Api\v1\MediaController;
+use App\Http\Controllers\DeployController;
 use Illuminate\Support\Facades\Route;
 
 // Публичные роуты
@@ -18,6 +19,10 @@ Route::prefix('auth')->group(function () {
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 });
+
+// Роут для обновления проекта (защищен секретным ключом)
+Route::post('/deploy', [DeployController::class, 'deploy'])->middleware('throttle:10,1');
+Route::get('/deploy/status', [DeployController::class, 'status']);
 
 // Защищённые роуты
 Route::middleware('auth:sanctum')->group(function () {
