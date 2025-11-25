@@ -183,15 +183,13 @@ export default {
                     localStorage.setItem('avito_auth_code', code);
                     localStorage.setItem('avito_auth_redirect', window.location.href);
                     
-                    // НЕ редиректим сразу - показываем сообщение пользователю
-                    // Редирект произойдет автоматически при следующем визите на страницу интеграции
-                    this.processing = false;
-                    this.error = null;
+                    console.log('✅ Code saved to localStorage, redirecting to integration page');
                     
-                    // Показываем сообщение о том, что код сохранен
+                    // Редиректим на страницу интеграции, где код будет автоматически обработан
+                    // Это работает, потому что страница интеграции проверяет localStorage при загрузке
                     setTimeout(() => {
-                        alert('Код авторизации получен и сохранен. Теперь вы можете закрыть это окно и вернуться на страницу интеграции.');
-                    }, 500);
+                        window.location.href = '/admin/avito/integration';
+                    }, 1000); // Даем время на сохранение в localStorage
                 }
             } else {
                 this.error = 'Код авторизации не получен';
