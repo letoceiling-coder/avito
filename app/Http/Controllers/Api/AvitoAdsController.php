@@ -33,17 +33,20 @@ class AvitoAdsController extends Controller
             ], 404);
         }
 
-        // Получаем userId
+        // Получаем userId из информации об аккаунте
+        // Согласно документации Авито, endpoint /accounts/self возвращает информацию о текущем аккаунте
         $testResult = $this->avitoApiService->testConnection($integration);
         if (!$testResult['success']) {
             \Log::error('Avito API: Failed to get user ID in index', [
                 'error' => $testResult['error'] ?? 'Unknown error',
                 'data' => $testResult['data'] ?? null,
                 'details' => $testResult['details'] ?? null,
+                'status' => $testResult['details']['error']['code'] ?? null,
             ]);
             return response()->json([
                 'success' => false,
                 'error' => $testResult['error'] ?? 'Ошибка подключения к API Авито',
+                'message' => 'Не удалось получить информацию об аккаунте. Возможно, токен недействителен или недостаточно прав доступа.',
                 'details' => $testResult,
             ], 400);
         }
