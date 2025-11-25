@@ -50,15 +50,39 @@ class DeployController extends Controller
             // Шаг 1: Обновление из git
             $log[] = "Шаг 1: Обновление кода из git...";
             
-            // Проверяем, является ли директория git репозиторием через git команду
+            // Проверяем, является ли директория git репозиторием
             $currentDir = getcwd();
             $log[] = "Текущая директория: {$currentDir}";
             
-            // Проверяем через git rev-parse
-            $gitCheck = $this->executeCommand('git rev-parse --git-dir 2>&1', $log);
+            // Проверяем несколькими способами
+            $isGitRepo = false;
             
-            if ($gitCheck['code'] === 0 && !empty($gitCheck['output'])) {
-                $log[] = "Git репозиторий найден, выполняется обновление...";
+            // Способ 1: Проверка директории .git
+            if (is_dir('.git') || is_dir($currentDir . '/.git')) {
+                $isGitRepo = true;
+                $log[] = "Git репозиторий найден через проверку директории .git";
+            }
+            
+            // Способ 2: Проверка через git rev-parse
+            if (!$isGitRepo) {
+                $gitCheck = $this->executeCommand('git rev-parse --git-dir 2>&1', $gitCheckLog);
+                if ($gitCheck['code'] === 0 && !empty($gitCheck['output'])) {
+                    $isGitRepo = true;
+                    $log[] = "Git репозиторий найден через git rev-parse";
+                }
+            }
+            
+            // Способ 3: Проверка через git status
+            if (!$isGitRepo) {
+                $gitStatus = $this->executeCommand('git status 2>&1', $gitStatusLog);
+                if ($gitStatus['code'] === 0) {
+                    $isGitRepo = true;
+                    $log[] = "Git репозиторий найден через git status";
+                }
+            }
+            
+            if ($isGitRepo) {
+                $log[] = "Выполняется обновление из git...";
                 $gitPull = $this->executeCommand('git pull origin master 2>&1', $log);
                 if ($gitPull['code'] !== 0) {
                     // Попробуем ветку main
@@ -74,7 +98,6 @@ class DeployController extends Controller
                 }
             } else {
                 $log[] = "Предупреждение: Директория не является git репозиторием";
-                $log[] = "Проверка через is_dir('.git'): " . (is_dir('.git') ? 'true' : 'false');
                 $log[] = "Пропуск обновления из git";
             }
             $log[] = "";
@@ -82,7 +105,27 @@ class DeployController extends Controller
             // Шаг 2: Установка PHP зависимостей
             $log[] = "Шаг 2: Установка PHP зависимостей...";
             $composerPath = $this->findComposer();
-            $this->executeCommand("{$composerPath} install --no-dev --optimize-autoloader --no-interaction 2>&1", $log);
+            $log[] = "Используется composer: {$composerPath}";
+            $log[] = "Текущая директория: " . getcwd();
+            
+            // Показываем информацию о HOME
+            $homeFromEnv = $this->getHomeFromEnv();
+            $homeFromGetenv = getenv('HOME');
+            $log[] = "HOME из .env: " . ($homeFromEnv ?: 'не найден');
+            $log[] = "HOME из getenv: " . ($homeFromGetenv ?: 'не установлен');
+            $log[] = "Пользователь: " . get_current_user();
+            
+            // Выполняем команду composer (мы уже в корне проекта)
+            // Используем параметры из требований: --no-interaction --prefer-dist --optimize-autoloader
+            $composerResult = $this->executeCommand("{$composerPath} install --no-interaction --prefer-dist --optimize-autoloader 2>&1", $log);
+            
+            if ($composerResult['code'] !== 0) {
+                $log[] = "Предупреждение: Ошибка при установке зависимостей через composer";
+                $log[] = "Код возврата: " . $composerResult['code'];
+                $log[] = "Попробуйте установить зависимости вручную: {$composerPath} install";
+            } else {
+                $log[] = "PHP зависимости установлены успешно";
+            }
             $log[] = "";
 
             // Шаг 3: Установка Node.js зависимостей (если доступен npm)
@@ -96,6 +139,7 @@ class DeployController extends Controller
             }
 
             // Шаг 4: Сборка фронтенда (если доступен npm)
+            // Требование: npm run build или npm run prod
             if ($this->commandExists('npm')) {
                 $log[] = "Шаг 4: Сборка фронтенда...";
                 
@@ -105,13 +149,23 @@ class DeployController extends Controller
                     $this->executeCommand("chmod -R +x {$nodeBinPath} 2>&1", $log);
                 }
                 
-                // Используем npx для гарантированного выполнения vite
-                $buildResult = $this->executeCommand('npx vite build 2>&1', $log);
+                // Сначала пробуем npm run prod (для продакшена)
+                $buildResult = $this->executeCommand('npm run prod 2>&1', $log);
                 
-                // Если npx не сработал, пробуем через npm run build
+                // Если npm run prod не сработал, пробуем npm run build
                 if ($buildResult['code'] !== 0) {
-                    $log[] = "Попытка через npm run build...";
-                    $this->executeCommand('npm run build 2>&1', $log);
+                    $log[] = "npm run prod не найден, пробуем npm run build...";
+                    $buildResult = $this->executeCommand('npm run build 2>&1', $log);
+                    
+                    // Если и build не сработал, пробуем через npx vite build
+                    if ($buildResult['code'] !== 0) {
+                        $log[] = "Попытка через npx vite build...";
+                        $this->executeCommand('npx vite build 2>&1', $log);
+                    } else {
+                        $log[] = "Фронтенд собран через npm run build";
+                    }
+                } else {
+                    $log[] = "Фронтенд собран через npm run prod";
                 }
                 
                 $log[] = "";
@@ -148,6 +202,22 @@ class DeployController extends Controller
             $log[] = "Представления закешированы";
             Artisan::call('optimize');
             $log[] = "Оптимизация завершена";
+            $log[] = "";
+
+            // Шаг 7.1: Перезапуск сервисов (опционально)
+            $log[] = "Шаг 7.1: Проверка и перезапуск сервисов...";
+            
+            // Перезапуск queue workers (если используется очередь)
+            if (config('queue.default') !== 'sync') {
+                $log[] = "Обнаружена очередь: " . config('queue.default');
+                $log[] = "Рекомендуется перезапустить queue workers вручную: php artisan queue:restart";
+                // Выполняем queue:restart для перезапуска workers
+                Artisan::call('queue:restart');
+                $log[] = "Команда queue:restart выполнена (workers перезапустятся автоматически)";
+            } else {
+                $log[] = "Очередь не используется (sync), перезапуск не требуется";
+            }
+            
             $log[] = "";
 
             // Шаг 8: Очистка логов
@@ -281,8 +351,14 @@ class DeployController extends Controller
      */
     private function findComposer()
     {
-        // Получаем домашнюю директорию пользователя разными способами
-        $homeDir = getenv('HOME');
+        // Сначала пробуем получить HOME из .env файла
+        $homeDir = $this->getHomeFromEnv();
+        
+        // Если не нашли в .env, пробуем другие способы
+        if (!$homeDir) {
+            $homeDir = getenv('HOME');
+        }
+        
         if (!$homeDir) {
             // Для Windows
             $homeDir = getenv('HOMEDRIVE') . getenv('HOMEPATH');
@@ -392,5 +468,20 @@ class DeployController extends Controller
         
         exec("which {$command} 2>&1", $output, $returnCode);
         return $returnCode === 0;
+    }
+
+    /**
+     * Получение HOME из .env файла
+     */
+    private function getHomeFromEnv()
+    {
+        $envFile = base_path('.env');
+        if (file_exists($envFile)) {
+            $envContent = file_get_contents($envFile);
+            if (preg_match('/^HOME=(.+)$/m', $envContent, $matches)) {
+                return trim($matches[1]);
+            }
+        }
+        return null;
     }
 }
