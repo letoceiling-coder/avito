@@ -310,29 +310,87 @@ class AvitoApiService
 
     /**
      * Создать объявление
+     * Согласно документации Авито API: https://developers.avito.ru/api-catalog
+     * Endpoint: POST /core/v1/accounts/{userId}/items
+     * 
+     * Структура данных для сферы услуг:
+     * {
+     *   "title": "string",
+     *   "description": "string",
+     *   "category_id": integer,
+     *   "location": {
+     *     "city_id": integer
+     *   },
+     *   "price": integer, // в копейках
+     *   "contact": {
+     *     "phone": "string"
+     *   },
+     *   "images": ["url1", "url2", ...],
+     *   "params": [...] // дополнительные параметры категории
+     * }
      */
     public function createAd(AvitoIntegration $integration, int $userId, array $adData): array
     {
         try {
+            Log::info('Avito API: Creating ad', [
+                'user_id' => $userId,
+                'integration_id' => $integration->id,
+                'ad_data_keys' => array_keys($adData),
+                'has_title' => isset($adData['title']),
+                'has_category' => isset($adData['category_id']),
+                'has_location' => isset($adData['location']),
+                'has_price' => isset($adData['price']),
+                'has_contact' => isset($adData['contact']),
+                'images_count' => isset($adData['images']) ? count($adData['images']) : 0,
+            ]);
+
             $client = $this->getAuthorizedClient($integration);
-            $response = $client->post(
-                self::BASE_URL . "/core/v1/accounts/{$userId}/items",
-                $adData
-            );
+            $url = self::BASE_URL . "/core/v1/accounts/{$userId}/items";
+            
+            Log::info('Avito API: Sending POST request', [
+                'url' => $url,
+                'ad_data' => $adData,
+            ]);
+
+            $response = $client->post($url, $adData);
+
+            Log::info('Avito API: Create ad response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+            ]);
 
             if ($response->successful()) {
+                $data = $response->json();
+                Log::info('Avito API: Ad created successfully', [
+                    'item_id' => $data['id'] ?? null,
+                    'status' => $data['status'] ?? null,
+                ]);
                 return [
                     'success' => true,
-                    'data' => $response->json(),
+                    'data' => $data,
                 ];
             }
 
+            $errorData = $response->json();
+            $errorMessage = $errorData['error']['message'] ?? $errorData['message'] ?? 'Ошибка создания объявления';
+            
+            Log::error('Avito API: Error creating ad', [
+                'status' => $response->status(),
+                'error' => $errorMessage,
+                'response' => $errorData,
+                'ad_data' => $adData,
+            ]);
+
             return [
                 'success' => false,
-                'error' => $response->json()['error']['message'] ?? 'Ошибка создания объявления',
-                'details' => $response->json(),
+                'error' => $errorMessage,
+                'details' => $errorData,
             ];
         } catch (Exception $e) {
+            Log::error('Avito API: Exception creating ad', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return [
                 'success' => false,
                 'error' => $e->getMessage(),

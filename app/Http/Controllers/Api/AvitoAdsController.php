@@ -178,6 +178,7 @@ class AvitoAdsController extends Controller
         }
 
         // Формируем данные объявления для сферы услуг
+        // Согласно документации Авито API: https://developers.avito.ru/api-catalog
         $adData = [
             'title' => $request->title,
             'description' => $request->description,
@@ -185,17 +186,21 @@ class AvitoAdsController extends Controller
             'location' => [
                 'city_id' => $request->location_id,
             ],
-            'price' => (int)($request->price * 100), // Цена в копейках
+            'price' => (int)($request->price * 100), // Цена в копейках (обязательно для платных услуг)
             'contact' => [
                 'phone' => $request->contact_phone,
             ],
-            'images' => $request->images ?? [],
-            'service_type' => $request->service_type ?? 'service',
         ];
 
-        // Добавляем дополнительные параметры из настроек
-        if ($request->has('params')) {
-            $adData = array_merge($adData, $request->params);
+        // Изображения (массив URL, максимум 20 для сферы услуг)
+        if ($request->has('images') && is_array($request->images)) {
+            // Ограничиваем количество изображений до 20 (лимит Авито)
+            $adData['images'] = array_slice($request->images, 0, 20);
+        }
+
+        // Дополнительные параметры категории (если есть)
+        if ($request->has('params') && is_array($request->params)) {
+            $adData['params'] = $request->params;
         }
 
         $result = $this->avitoApiService->createAd($integration, $userId, $adData);
@@ -309,6 +314,7 @@ class AvitoAdsController extends Controller
 
         foreach ($cities as $cityId) {
             // Формируем данные объявления для каждого города
+            // Согласно документации Авито API для сферы услуг
             $adData = [
                 'title' => $template['title'],
                 'description' => $template['description'],
@@ -316,33 +322,54 @@ class AvitoAdsController extends Controller
                 'location' => [
                     'city_id' => $cityId,
                 ],
-                'price' => (int)($template['price'] * 100), // Цена в копейках
+                'price' => (int)($template['price'] * 100), // Цена в копейках (обязательно для платных услуг)
                 'contact' => [
                     'phone' => $template['contact_phone'],
                 ],
-                'images' => $template['images'] ?? [],
-                'service_type' => $template['service_type'] ?? 'service',
             ];
 
-            // Добавляем дополнительные параметры
-            if (isset($template['params'])) {
-                $adData = array_merge($adData, $template['params']);
+            // Изображения (массив URL, максимум 20 для сферы услуг)
+            if (!empty($template['images']) && is_array($template['images'])) {
+                // Ограничиваем количество изображений до 20 (лимит Авито)
+                $adData['images'] = array_slice($template['images'], 0, 20);
             }
 
-            // Добавляем флаги VIP, Premium, Auto-renew если они есть
-            if (isset($template['is_vip']) && $template['is_vip']) {
-                $adData['vas'] = $adData['vas'] ?? [];
-                $adData['vas'][] = 'vip';
+            // Дополнительные параметры категории (если есть)
+            if (isset($template['params']) && is_array($template['params'])) {
+                $adData['params'] = $template['params'];
             }
-            if (isset($template['is_premium']) && $template['is_premium']) {
-                $adData['vas'] = $adData['vas'] ?? [];
-                $adData['vas'][] = 'premium';
-            }
-            if (isset($template['is_auto_renew']) && $template['is_auto_renew']) {
-                $adData['auto_renew'] = true;
-            }
+
+            // VAS (дополнительные услуги) - применяются после создания объявления
+            // VIP и Premium применяются через отдельный endpoint после создания
+            // Не включаем их в тело запроса создания, так как это может вызвать ошибку
+
+            // Auto-renew (автопродление) - также применяется отдельно
+            // Не включаем в запрос создания
 
             $result = $this->avitoApiService->createAd($integration, $userId, $adData);
+            
+            // Если объявление успешно создано и нужно применить VAS
+            if ($result['success'] && isset($result['data']['id'])) {
+                $itemId = $result['data']['id'];
+                $vasToApply = [];
+                
+                if (isset($template['is_vip']) && $template['is_vip']) {
+                    $vasToApply[] = 'vip';
+                }
+                if (isset($template['is_premium']) && $template['is_premium']) {
+                    $vasToApply[] = 'premium';
+                }
+                
+                // Применяем VAS если нужно (через отдельный метод)
+                if (!empty($vasToApply)) {
+                    // TODO: Реализовать применение VAS через отдельный endpoint
+                    // Пока просто логируем
+                    \Log::info('Avito API: VAS should be applied', [
+                        'item_id' => $itemId,
+                        'vas' => $vasToApply,
+                    ]);
+                }
+            }
             
             $results[] = [
                 'city_id' => $cityId,
