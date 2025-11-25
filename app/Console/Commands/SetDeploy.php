@@ -75,18 +75,38 @@ class SetDeploy extends Command
 
             // Шаг 5: Отправка в git
             $this->info('Шаг 4: Отправка в git репозиторий...');
-            exec('git push origin master 2>&1', $pushOutput, $pushReturnCode);
+            
+            // Определяем текущую ветку
+            exec('git branch --show-current 2>&1', $branchOutput, $branchCode);
+            $currentBranch = !empty($branchOutput) ? trim($branchOutput[0]) : 'master';
+            
+            // Пробуем отправить в текущую ветку
+            exec("git push origin {$currentBranch} 2>&1", $pushOutput, $pushReturnCode);
             
             if ($pushReturnCode !== 0) {
-                // Попробуем ветку main
-                exec('git push origin main 2>&1', $pushOutput, $pushReturnCode);
-                if ($pushReturnCode !== 0) {
-                    $this->error('Ошибка при отправке в git репозиторий!');
-                    $this->line(implode("\n", $pushOutput));
-                    return 1;
+                // Попробуем ветку master
+                if ($currentBranch !== 'master') {
+                    exec('git push origin master 2>&1', $pushOutput, $pushReturnCode);
                 }
+                
+                if ($pushReturnCode !== 0) {
+                    // Попробуем ветку main
+                    exec('git push origin main 2>&1', $pushOutput, $pushReturnCode);
+                    if ($pushReturnCode !== 0) {
+                        $this->error('Ошибка при отправке в git репозиторий!');
+                        $this->line('Текущая ветка: ' . ($currentBranch ?: 'не определена'));
+                        $this->line(implode("\n", $pushOutput));
+                        $this->warn('Продолжаем развертывание, но изменения могут быть не отправлены в git');
+                        // Не возвращаем ошибку, продолжаем развертывание
+                    } else {
+                        $this->info('Изменения отправлены в git (ветка main)');
+                    }
+                } else {
+                    $this->info('Изменения отправлены в git (ветка master)');
+                }
+            } else {
+                $this->info("Изменения отправлены в git (ветка {$currentBranch})");
             }
-            $this->info('Изменения отправлены в git');
         }
 
         // Шаг 6: Отправка POST запроса на сервер

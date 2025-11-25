@@ -50,15 +50,14 @@ class DeployController extends Controller
             // Шаг 1: Обновление из git
             $log[] = "Шаг 1: Обновление кода из git...";
             
-            // Проверяем, является ли директория git репозиторием
-            $gitDir = getcwd() . '/.git';
-            $log[] = "Проверка git репозитория в: " . getcwd();
-            $log[] = "Путь к .git: {$gitDir}";
+            // Проверяем, является ли директория git репозиторием через git команду
+            $currentDir = getcwd();
+            $log[] = "Текущая директория: {$currentDir}";
             
-            if (!is_dir('.git') && !is_dir($gitDir)) {
-                $log[] = "Предупреждение: Директория не является git репозиторием";
-                $log[] = "Пропуск обновления из git";
-            } else {
+            // Проверяем через git rev-parse
+            $gitCheck = $this->executeCommand('git rev-parse --git-dir 2>&1', $log);
+            
+            if ($gitCheck['code'] === 0 && !empty($gitCheck['output'])) {
                 $log[] = "Git репозиторий найден, выполняется обновление...";
                 $gitPull = $this->executeCommand('git pull origin master 2>&1', $log);
                 if ($gitPull['code'] !== 0) {
@@ -73,6 +72,10 @@ class DeployController extends Controller
                 } else {
                     $log[] = "Код успешно обновлен из ветки master";
                 }
+            } else {
+                $log[] = "Предупреждение: Директория не является git репозиторием";
+                $log[] = "Проверка через is_dir('.git'): " . (is_dir('.git') ? 'true' : 'false');
+                $log[] = "Пропуск обновления из git";
             }
             $log[] = "";
 
@@ -278,22 +281,59 @@ class DeployController extends Controller
      */
     private function findComposer()
     {
-        // Получаем домашнюю директорию пользователя
+        // Получаем домашнюю директорию пользователя разными способами
         $homeDir = getenv('HOME');
         if (!$homeDir) {
             // Для Windows
             $homeDir = getenv('HOMEDRIVE') . getenv('HOMEPATH');
         }
         
+        // Альтернативный способ получения домашней директории через posix
+        if (!$homeDir && function_exists('posix_getpwuid')) {
+            $userInfo = posix_getpwuid(posix_geteuid());
+            if ($userInfo && isset($userInfo['dir'])) {
+                $homeDir = $userInfo['dir'];
+            }
+        }
+        
+        // Еще один способ - через whoami и /etc/passwd
+        if (!$homeDir) {
+            $whoami = trim(shell_exec('whoami 2>/dev/null'));
+            if ($whoami) {
+                $passwdLine = shell_exec("grep ^{$whoami}: /etc/passwd 2>/dev/null");
+                if ($passwdLine) {
+                    $parts = explode(':', $passwdLine);
+                    if (isset($parts[5])) {
+                        $homeDir = $parts[5];
+                    }
+                }
+            }
+        }
+        
         // Получаем пользователя, который запускает PHP
         $user = get_current_user();
+        
+        // Логируем для отладки (будет видно в логах)
+        $dummy = [];
+        if ($homeDir) {
+            $dummy[] = "HOME найден: {$homeDir}";
+        } else {
+            $dummy[] = "HOME не найден";
+        }
+        $dummy[] = "Пользователь: {$user}";
         
         // Проверяем различные возможные пути
         $paths = [];
         
         // Сначала проверяем домашнюю директорию пользователя
-        if ($homeDir && file_exists($homeDir . '/composer.phar')) {
-            $paths[] = 'php ' . $homeDir . '/composer.phar';
+        if ($homeDir) {
+            $composerPhar = $homeDir . '/composer.phar';
+            if (file_exists($composerPhar)) {
+                $paths[] = 'php ' . $composerPhar;
+                $dummy[] = "Найден composer.phar в: {$composerPhar}";
+            } else {
+                $dummy[] = "composer.phar не найден в: {$composerPhar}";
+            }
         }
         
         // Проверяем глобальный composer
@@ -318,7 +358,7 @@ class DeployController extends Controller
                 // Если это путь с файлом, проверяем существование файла
                 if (count($commandParts) > 1 && strpos($path, 'composer.phar') !== false) {
                     // Заменяем ~ на реальный путь
-                    $filePath = str_replace('~/', $homeDir . '/', $path);
+                    $filePath = str_replace('~/', ($homeDir ? $homeDir . '/' : ''), $path);
                     $filePath = preg_replace('/^php\s+/', '', $filePath);
                     
                     if (file_exists($filePath)) {
@@ -326,7 +366,7 @@ class DeployController extends Controller
                     }
                 } else {
                     // Для простых команд проверяем, что они работают
-                    $testResult = $this->executeCommand("{$path} --version 2>&1", $dummy);
+                    $testResult = $this->executeCommand("{$path} --version 2>&1", $testLog);
                     if ($testResult['code'] === 0) {
                         return $path;
                     }

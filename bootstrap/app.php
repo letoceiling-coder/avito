@@ -16,9 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         ]);
         
-        // Исключаем роут /deploy из CSRF проверки (защита через DEPLOY_TOKEN)
+        // Исключаем роуты из CSRF проверки (защита через DEPLOY_TOKEN)
         $middleware->validateCsrfTokens(except: [
             'deploy',
+            'logs',
+            'logs/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
