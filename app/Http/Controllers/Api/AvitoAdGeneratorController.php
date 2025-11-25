@@ -349,7 +349,6 @@ class AvitoAdGeneratorController extends Controller
                     sleep(1);
                 }
             }
-            }
 
             // Если не было сгенерировано ни одного объявления, возвращаем ошибку
             if (empty($generatedAds)) {
