@@ -369,12 +369,36 @@ class AvitoApiService
 
             $response = $client->post($url, $adData);
             
-            // Если получили 404, пробуем альтернативный endpoint
+            // Если получили 404, пробуем альтернативные варианты
             if ($response->status() === 404) {
-                Log::warning('Avito API: Got 404 with userId in path, trying alternative endpoint');
-                $alternativeUrl = self::BASE_URL . "/core/v1/items";
-                Log::info('Avito API: Trying alternative endpoint', ['url' => $alternativeUrl]);
-                $response = $client->post($alternativeUrl, $adData);
+                Log::warning('Avito API: Got 404 with userId in path, trying alternative endpoints');
+                
+                // Вариант 1: Без userId в пути
+                $alternativeUrl1 = self::BASE_URL . "/core/v1/items";
+                Log::info('Avito API: Trying alternative endpoint 1', ['url' => $alternativeUrl1]);
+                $response = $client->post($alternativeUrl1, $adData);
+                
+                // Если все еще 404, пробуем другой формат
+                if ($response->status() === 404) {
+                    // Вариант 2: Может быть нужен другой путь для создания
+                    // Проверяем, может быть нужен /v1/items вместо /core/v1/items
+                    $alternativeUrl2 = self::BASE_URL . "/v1/items";
+                    Log::info('Avito API: Trying alternative endpoint 2', ['url' => $alternativeUrl2]);
+                    $response = $client->post($alternativeUrl2, $adData);
+                }
+                
+                // Если все еще 404, логируем предупреждение о необходимости проверки scope
+                if ($response->status() === 404) {
+                    Log::error('Avito API: All endpoints returned 404. Possible issues:', [
+                        'tried_endpoints' => [
+                            $url,
+                            $alternativeUrl1,
+                            $alternativeUrl2 ?? null,
+                        ],
+                        'suggestion' => 'Check if token has items:write scope and re-authorize if needed',
+                        'current_scope' => 'Should include items:write for creating ads',
+                    ]);
+                }
             }
 
             Log::info('Avito API: Create ad response', [
