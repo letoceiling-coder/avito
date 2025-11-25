@@ -139,20 +139,50 @@ class AvitoApiService
     {
         try {
             $client = $this->getAuthorizedClient($integration);
-            $response = $client->get(self::BASE_URL . '/core/v1/accounts/self');
+            $url = self::BASE_URL . '/core/v1/accounts/self';
+            
+            Log::info('Avito API: Testing connection', [
+                'url' => $url,
+                'integration_id' => $integration->id,
+            ]);
+            
+            $response = $client->get($url);
+
+            Log::info('Avito API: Test connection response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+            ]);
 
             if ($response->successful()) {
+                $data = $response->json();
+                Log::info('Avito API: Connection successful', [
+                    'data' => $data,
+                ]);
                 return [
                     'success' => true,
-                    'data' => $response->json(),
+                    'data' => $data,
                 ];
             }
 
+            $errorData = $response->json();
+            $errorMessage = $errorData['error']['message'] ?? $errorData['message'] ?? 'Ошибка подключения';
+            
+            Log::error('Avito API: Connection test failed', [
+                'status' => $response->status(),
+                'error' => $errorMessage,
+                'response' => $errorData,
+            ]);
+
             return [
                 'success' => false,
-                'error' => $response->json()['error']['message'] ?? 'Ошибка подключения',
+                'error' => $errorMessage,
+                'details' => $errorData,
             ];
         } catch (Exception $e) {
+            Log::error('Avito API: Exception in test connection', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
@@ -167,7 +197,20 @@ class AvitoApiService
     {
         try {
             $client = $this->getAuthorizedClient($integration);
-            $response = $client->get(self::BASE_URL . "/core/v1/accounts/{$userId}/items", $params);
+            $url = self::BASE_URL . "/core/v1/accounts/{$userId}/items";
+            
+            Log::info('Avito API: Getting ads', [
+                'user_id' => $userId,
+                'url' => $url,
+                'params' => $params,
+            ]);
+            
+            $response = $client->get($url, $params);
+
+            Log::info('Avito API: Get ads response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+            ]);
 
             if ($response->successful()) {
                 return [
@@ -176,11 +219,25 @@ class AvitoApiService
                 ];
             }
 
+            $errorData = $response->json();
+            $errorMessage = $errorData['error']['message'] ?? $errorData['message'] ?? 'Ошибка получения объявлений';
+            
+            Log::error('Avito API: Error getting ads', [
+                'status' => $response->status(),
+                'error' => $errorMessage,
+                'response' => $errorData,
+            ]);
+
             return [
                 'success' => false,
-                'error' => $response->json()['error']['message'] ?? 'Ошибка получения объявлений',
+                'error' => $errorMessage,
+                'details' => $errorData,
             ];
         } catch (Exception $e) {
+            Log::error('Avito API: Exception getting ads', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
