@@ -285,32 +285,47 @@ const router = createRouter({
 
 // Navigation guard
 router.beforeEach((to, from, next) => {
-    const isAuthenticated = store.getters.isAuthenticated;
-    
     // ВАЖНО: Callback роут для Авито должен быть доступен без авторизации
     // Это критично для OAuth flow, так как callback может быть вызван из popup окна
+    // Проверяем ПЕРВЫМ ДЕЛОМ, ДО получения isAuthenticated, чтобы избежать лишних проверок
     // Проверяем несколькими способами для надежности
     const isCallbackRoute = to.path === '/admin/avito/callback' || 
+                           to.path.startsWith('/admin/avito/callback') ||
                            to.name === 'admin.avito.callback' ||
-                           to.meta.public === true ||
-                           (to.meta.requiresAuth === false && to.path.includes('/admin/avito/callback'));
+                           to.meta?.public === true ||
+                           (to.meta?.requiresAuth === false && to.path.includes('/admin/avito/callback'));
     
     if (isCallbackRoute) {
+        // Для callback роута не проверяем авторизацию вообще
         console.log('✅ Avito callback route detected - allowing access without auth', {
             path: to.path,
             name: to.name,
             fullPath: to.fullPath,
             meta: to.meta,
-            isAuthenticated: isAuthenticated,
-            matched: to.matched.map(m => ({ path: m.path, name: m.name }))
+            matched: to.matched.map(m => ({ path: m.path, name: m.name, meta: m.meta }))
         });
-        // Явно игнорируем requiresAuth для этого роута
         next();
         return;
     }
     
+    // Дополнительная проверка: если путь содержит callback, но роут не распознан
+    if (to.path.includes('/admin/avito/callback') && !isCallbackRoute) {
+        console.warn('⚠️ Callback path detected but route not recognized - allowing anyway:', {
+            path: to.path,
+            name: to.name,
+            fullPath: to.fullPath,
+            meta: to.meta
+        });
+        // Разрешаем доступ на всякий случай
+        next();
+        return;
+    }
+    
+    // Только теперь проверяем авторизацию для остальных роутов
+    const isAuthenticated = store.getters.isAuthenticated;
+    
     // Проверяем requiresAuth только если это не публичный роут
-    if (to.meta.requiresAuth && !isAuthenticated && !to.meta.public) {
+    if (to.meta?.requiresAuth && !isAuthenticated && !to.meta?.public) {
         console.log('🔒 Route requires auth, redirecting to login', {
             path: to.path,
             name: to.name,

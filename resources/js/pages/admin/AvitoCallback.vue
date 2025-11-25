@@ -179,12 +179,19 @@ export default {
                 } else {
                     console.log('No opener found, using localStorage fallback');
                     // Если нет opener, возможно это прямой редирект
-                    // Сохраняем код в localStorage и редиректим обратно
+                    // Сохраняем код в localStorage
                     localStorage.setItem('avito_auth_code', code);
                     localStorage.setItem('avito_auth_redirect', window.location.href);
                     
-                    // Редиректим на страницу интеграции
-                    window.location.href = '/admin/avito/integration';
+                    // НЕ редиректим сразу - показываем сообщение пользователю
+                    // Редирект произойдет автоматически при следующем визите на страницу интеграции
+                    this.processing = false;
+                    this.error = null;
+                    
+                    // Показываем сообщение о том, что код сохранен
+                    setTimeout(() => {
+                        alert('Код авторизации получен и сохранен. Теперь вы можете закрыть это окно и вернуться на страницу интеграции.');
+                    }, 500);
                 }
             } else {
                 this.error = 'Код авторизации не получен';
