@@ -1,0 +1,49 @@
+# Команды для развертывания на сервере Beget
+# Скопируйте и выполните на сервере
+
+# 1. Сделать скрипт исполняемым
+chmod +x deploy.sh
+
+# 2. Запустить развертывание
+./deploy.sh
+
+# ИЛИ упрощенная версия:
+chmod +x deploy-beget.sh
+./deploy-beget.sh
+
+# ============================================
+# Ручные команды (если скрипт не работает):
+# ============================================
+
+# Обновление кода
+git pull origin master
+
+# Установка зависимостей
+php ~/composer.phar install --no-dev --optimize-autoloader --no-interaction
+# или
+composer install --no-dev --optimize-autoloader --no-interaction
+
+# Установка Node зависимостей (если доступен npm)
+npm install
+npm run build
+
+# Миграции
+php artisan migrate --force
+
+# Очистка кешей
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+
+# Кеширование для продакшена
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan optimize
+
+# Очистка логов
+> storage/logs/laravel.log
+
+# Установка прав
+chmod -R 755 storage bootstrap/cache
