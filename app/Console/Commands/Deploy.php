@@ -375,34 +375,52 @@ class Deploy extends Command
                 $this->newLine();
                 $this->info('🔨 Сборка фронтенда...');
                 
-                // Устанавливаем права на выполнение для node_modules/.bin (исправление проблемы с vite)
-                $nodeModulesBin = base_path('node_modules/.bin');
-                if (is_dir($nodeModulesBin)) {
+                // Устанавливаем права на выполнение для всех бинарных файлов в node_modules
+                // Это исправляет проблемы с vite, esbuild и другими инструментами
+                $nodeModules = base_path('node_modules');
+                if (is_dir($nodeModules)) {
                     try {
-                        // Пробуем установить права через chmod
-                        $chmodProcess = new SymfonyProcess(['chmod', '-R', '+x', $nodeModulesBin]);
-                        $chmodProcess->run();
+                        $this->line('   Установка прав на выполнение для бинарных файлов...');
                         
-                        // Также пробуем установить права конкретно на vite и npx
-                        $vitePath = $nodeModulesBin . '/vite';
-                        $npxPath = $nodeModulesBin . '/npx';
-                        
-                        if (file_exists($vitePath)) {
-                            $viteChmod = new SymfonyProcess(['chmod', '+x', $vitePath]);
-                            $viteChmod->run();
+                        // Устанавливаем права на node_modules/.bin
+                        $nodeModulesBin = $nodeModules . '/.bin';
+                        if (is_dir($nodeModulesBin)) {
+                            $chmodBin = new SymfonyProcess(['chmod', '-R', '+x', $nodeModulesBin]);
+                            $chmodBin->run();
                         }
                         
-                        if (file_exists($npxPath)) {
-                            $npxChmod = new SymfonyProcess(['chmod', '+x', $npxPath]);
-                            $npxChmod->run();
+                        // Устанавливаем права на все бинарные файлы в @esbuild (и других пакетах с бинарниками)
+                        $esbuildPaths = [
+                            $nodeModules . '/@esbuild/linux-x64/bin/esbuild',
+                            $nodeModules . '/@esbuild/linux-arm64/bin/esbuild',
+                            $nodeModules . '/@esbuild/darwin-x64/bin/esbuild',
+                            $nodeModules . '/@esbuild/darwin-arm64/bin/esbuild',
+                            $nodeModules . '/@esbuild/win32-x64/bin/esbuild.exe',
+                        ];
+                        
+                        foreach ($esbuildPaths as $esbuildPath) {
+                            if (file_exists($esbuildPath)) {
+                                $esbuildChmod = new SymfonyProcess(['chmod', '+x', $esbuildPath]);
+                                $esbuildChmod->run();
+                            }
                         }
                         
-                        if ($chmodProcess->isSuccessful()) {
-                            $this->line('   ✓ Права на выполнение установлены для node_modules/.bin');
-                        }
+                        // Устанавливаем права на все директории с bin в node_modules
+                        $findBinProcess = new SymfonyProcess([
+                            'find', $nodeModules, '-type', 'd', '-name', 'bin', '-exec', 'chmod', '-R', '+x', '{}', ';'
+                        ]);
+                        $findBinProcess->run();
+                        
+                        // Также устанавливаем права на все исполняемые файлы
+                        $findExecProcess = new SymfonyProcess([
+                            'find', $nodeModules, '-type', 'f', '-name', 'esbuild', '-o', '-name', 'vite', '-o', '-name', 'npx', '-exec', 'chmod', '+x', '{}', ';'
+                        ]);
+                        $findExecProcess->run();
+                        
+                        $this->line('   ✓ Права на выполнение установлены для бинарных файлов');
                     } catch (\Exception $e) {
                         // Игнорируем ошибки chmod, продолжаем сборку
-                        $this->warn('   ⚠️  Не удалось установить права автоматически, пробуем npx напрямую...');
+                        $this->warn('   ⚠️  Не удалось установить права автоматически: ' . $e->getMessage());
                     }
                 }
                 
