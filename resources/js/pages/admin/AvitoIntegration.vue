@@ -263,6 +263,36 @@ export default {
                     return;
                 }
                 
+                // Показываем предупреждение перед открытием окна
+                const openWindowConfirm = await Swal.fire({
+                    icon: 'warning',
+                    title: '⚠️ ВАЖНО: Не закрывайте окно авторизации!',
+                    html: `
+                        <p style="margin-bottom: 15px;">Сейчас откроется окно авторизации Авито.</p>
+                        <div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 15px; margin: 15px 0; text-align: left;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">📋 Что нужно сделать:</p>
+                            <ol style="margin: 0; padding-left: 20px; color: #856404;">
+                                <li>Войдите в свой аккаунт Авито (если не авторизованы)</li>
+                                <li>Разрешите доступ приложению</li>
+                                <li><strong>НЕ ЗАКРЫВАЙТЕ окно</strong> - оно закроется автоматически</li>
+                                <li>Дождитесь редиректа на callback страницу</li>
+                            </ol>
+                        </div>
+                        <p style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                            Если увидите ошибку "Что-то пошло не так", проверьте настройки приложения Авито.
+                        </p>
+                    `,
+                    confirmButtonText: 'Открыть окно авторизации',
+                    showCancelButton: true,
+                    cancelButtonText: 'Отмена',
+                    width: '600px',
+                    confirmButtonColor: '#0066cc',
+                });
+
+                if (!openWindowConfirm.isConfirmed) {
+                    return;
+                }
+
                 // Открываем окно авторизации
                 const authWindow = window.open(
                     response.data.auth_url,
@@ -394,10 +424,39 @@ export default {
 
                 window.addEventListener('message', messageListener);
 
+                // Показываем уведомление о том, что окно открыто
+                let notificationShown = false;
+                
                 // Проверяем, не закрыл ли пользователь окно
                 let checkCount = 0;
                 const checkClosed = setInterval(() => {
                     checkCount++;
+                    
+                    // Показываем уведомление через 5 секунд, если окно еще открыто
+                    if (!notificationShown && checkCount === 5) {
+                        notificationShown = true;
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'Окно авторизации открыто',
+                            html: `
+                                <p>Пожалуйста, <strong>НЕ ЗАКРЫВАЙТЕ</strong> окно авторизации.</p>
+                                <p style="margin-top: 10px;">Дождитесь, пока:</p>
+                                <ul style="text-align: left; margin-top: 10px;">
+                                    <li>Вы войдете в аккаунт Авито (если нужно)</li>
+                                    <li>Разрешите доступ приложению</li>
+                                    <li>Произойдет автоматический редирект</li>
+                                </ul>
+                                <p style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                                    Окно закроется автоматически после успешной авторизации.
+                                </p>
+                            `,
+                            confirmButtonText: 'Понятно',
+                            timer: 5000,
+                            timerProgressBar: true,
+                            allowOutsideClick: false,
+                        });
+                    }
+                    
                     if (authWindow.closed) {
                         console.log('⚠️ Auth window closed by user (check #' + checkCount + ')');
                         clearInterval(checkClosed);
@@ -418,11 +477,32 @@ export default {
                                 });
                             } else {
                                 console.warn('⚠️ No code found in localStorage. Callback page may not have loaded.');
-                                console.warn('💡 Возможные причины:');
-                                console.warn('   1. Окно было закрыто до того, как Авито сделал редирект на callback URL');
-                                console.warn('   2. Callback страница не загрузилась');
-                                console.warn('   3. Redirect URI в настройках приложения Авито не совпадает');
-                                console.warn('💡 Попробуйте авторизоваться снова и НЕ закрывайте окно авторизации');
+                                
+                                // Показываем подробное сообщение об ошибке
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Авторизация не завершена',
+                                    html: `
+                                        <p>Окно авторизации было закрыто до завершения процесса.</p>
+                                        <div style="background: #f8f9fa; border-left: 4px solid #dc3545; padding: 15px; margin: 15px 0; text-align: left;">
+                                            <p style="margin: 0 0 10px 0; font-weight: bold;">Возможные причины:</p>
+                                            <ol style="margin: 0; padding-left: 20px;">
+                                                <li>Окно было закрыто до того, как Авито сделал редирект на callback URL</li>
+                                                <li>Авито показал ошибку "Что-то пошло не так" (проверьте настройки приложения)</li>
+                                                <li>Callback страница не успела загрузиться</li>
+                                            </ol>
+                                        </div>
+                                        <p style="margin-top: 15px;"><strong>Что делать:</strong></p>
+                                        <ol style="text-align: left; margin-top: 10px;">
+                                            <li>Попробуйте авторизоваться снова</li>
+                                            <li><strong>НЕ ЗАКРЫВАЙТЕ</strong> окно авторизации вручную</li>
+                                            <li>Дождитесь автоматического закрытия окна</li>
+                                            <li>Если видите ошибку в окне Авито, проверьте Redirect URI в настройках приложения</li>
+                                        </ol>
+                                    `,
+                                    confirmButtonText: 'Попробовать снова',
+                                    width: '600px',
+                                });
                             }
                         }, 2000); // Даем 2 секунды на обработку
                     } else {
