@@ -49,19 +49,34 @@ class AvitoAdsController extends Controller
         }
         
         // Проверяем структуру ответа - userId может быть в разных полях
-        $userId = $testResult['data']['id'] 
-               ?? $testResult['data']['user_id'] 
-               ?? $testResult['data']['account_id']
+        // Согласно документации Авито, ответ от /accounts/self может содержать разные поля
+        $data = $testResult['data'] ?? [];
+        $userId = $data['id'] 
+               ?? $data['user_id'] 
+               ?? $data['account_id']
+               ?? $data['userId']
                ?? null;
+        
+        \Log::info('Avito API: Extracting user ID', [
+            'data_structure' => $data,
+            'data_keys' => is_array($data) ? array_keys($data) : 'not_array',
+            'found_user_id' => $userId,
+        ]);
         
         if (!$userId) {
             \Log::error('Avito API: User ID not found in response', [
                 'test_result' => $testResult,
+                'data' => $data,
+                'all_keys' => is_array($data) ? array_keys($data) : 'not_array',
             ]);
             return response()->json([
                 'success' => false,
                 'error' => 'Не удалось определить ID пользователя из ответа API',
-                'details' => $testResult,
+                'details' => [
+                    'test_result' => $testResult,
+                    'data_structure' => $data,
+                    'available_keys' => is_array($data) ? array_keys($data) : 'not_array',
+                ],
             ], 400);
         }
 

@@ -173,6 +173,10 @@ class AvitoApiService
                 $data = $response->json();
                 Log::info('Avito API: Connection successful', [
                     'data' => $data,
+                    'data_keys' => is_array($data) ? array_keys($data) : 'not_array',
+                    'has_id' => isset($data['id']),
+                    'has_user_id' => isset($data['user_id']),
+                    'has_account_id' => isset($data['account_id']),
                 ]);
                 return [
                     'success' => true,
