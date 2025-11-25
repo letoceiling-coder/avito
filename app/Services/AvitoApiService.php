@@ -380,6 +380,8 @@ class AvitoApiService
             Log::info('Avito API: Create ad response', [
                 'status' => $response->status(),
                 'successful' => $response->successful(),
+                'url_used' => $url,
+                'response_body' => $response->body(),
             ]);
 
             if ($response->successful()) {
@@ -387,6 +389,7 @@ class AvitoApiService
                 Log::info('Avito API: Ad created successfully', [
                     'item_id' => $data['id'] ?? null,
                     'status' => $data['status'] ?? null,
+                    'data_structure' => is_array($data) ? array_keys($data) : 'not_array',
                 ]);
                 return [
                     'success' => true,
@@ -397,11 +400,27 @@ class AvitoApiService
             $errorData = $response->json();
             $errorMessage = $errorData['error']['message'] ?? $errorData['message'] ?? 'Ошибка создания объявления';
             
+            // Детальное логирование для диагностики
             Log::error('Avito API: Error creating ad', [
                 'status' => $response->status(),
                 'error' => $errorMessage,
                 'response' => $errorData,
-                'ad_data' => $adData,
+                'response_body' => $response->body(),
+                'url_used' => $url,
+                'user_id' => $userId,
+                'ad_data_structure' => [
+                    'has_title' => isset($adData['title']),
+                    'has_description' => isset($adData['description']),
+                    'has_category_id' => isset($adData['category_id']),
+                    'has_location' => isset($adData['location']),
+                    'location_structure' => isset($adData['location']) ? array_keys($adData['location']) : null,
+                    'has_price' => isset($adData['price']),
+                    'has_contact' => isset($adData['contact']),
+                    'contact_structure' => isset($adData['contact']) ? array_keys($adData['contact']) : null,
+                    'has_images' => isset($adData['images']),
+                    'images_count' => isset($adData['images']) ? count($adData['images']) : 0,
+                    'all_keys' => array_keys($adData),
+                ],
             ]);
 
             return [
