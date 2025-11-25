@@ -348,14 +348,6 @@ class AvitoAdGeneratorController extends Controller
                 if ($i < $count - 1) {
                     sleep(1);
                 }
-            } catch (Exception $e) {
-                Log::error('Exception when saving ad to database', [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'iteration' => $i + 1,
-                ]);
-                // Продолжаем генерацию других объявлений
-                continue;
             }
             }
 
