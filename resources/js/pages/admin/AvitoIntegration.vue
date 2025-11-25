@@ -389,19 +389,28 @@ export default {
                         clearInterval(checkClosed);
                         window.removeEventListener('message', messageListener);
                         
-                        // Проверяем, есть ли код в localStorage (fallback)
-                        const savedCode = localStorage.getItem('avito_auth_code');
-                        if (savedCode) {
-                            console.log('✅ Found code in localStorage, using fallback');
-                            localStorage.removeItem('avito_auth_code');
-                            localStorage.removeItem('avito_auth_redirect');
-                            // Сохраняем токены асинхронно
-                            this.saveTokens(savedCode).catch(err => {
-                                console.error('Error saving tokens from localStorage:', err);
-                            });
-                        } else {
-                            console.warn('⚠️ No code found in localStorage. Callback page may not have loaded.');
-                        }
+                        // Даем немного времени на то, чтобы callback страница успела отправить сообщение
+                        // или сохранить код в localStorage
+                        setTimeout(() => {
+                            // Проверяем, есть ли код в localStorage (fallback)
+                            const savedCode = localStorage.getItem('avito_auth_code');
+                            if (savedCode) {
+                                console.log('✅ Found code in localStorage, using fallback');
+                                localStorage.removeItem('avito_auth_code');
+                                localStorage.removeItem('avito_auth_redirect');
+                                // Сохраняем токены асинхронно
+                                this.saveTokens(savedCode).catch(err => {
+                                    console.error('Error saving tokens from localStorage:', err);
+                                });
+                            } else {
+                                console.warn('⚠️ No code found in localStorage. Callback page may not have loaded.');
+                                console.warn('💡 Возможные причины:');
+                                console.warn('   1. Окно было закрыто до того, как Авито сделал редирект на callback URL');
+                                console.warn('   2. Callback страница не загрузилась');
+                                console.warn('   3. Redirect URI в настройках приложения Авито не совпадает');
+                                console.warn('💡 Попробуйте авторизоваться снова и НЕ закрывайте окно авторизации');
+                            }
+                        }, 2000); // Даем 2 секунды на обработку
                     } else {
                         // Проверяем URL окна авторизации (если доступно)
                         try {
@@ -430,6 +439,23 @@ export default {
                         console.warn('⚠️ Auth timeout - window still open after 5 minutes');
                         console.warn('💡 Возможно, callback страница не загрузилась или не отправила сообщение');
                         console.warn('💡 Проверьте, что callback URL правильный и страница доступна');
+                        console.warn('💡 Проверьте консоль в окне авторизации (F12)');
+                        
+                        // Предлагаем пользователю проверить окно авторизации
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Авторизация не завершена',
+                            html: `
+                                <p>Окно авторизации открыто более 5 минут.</p>
+                                <p class="mt-2"><strong>Что делать:</strong></p>
+                                <ol class="text-left mt-2 space-y-1">
+                                    <li>1. Проверьте окно авторизации - возможно, нужно подтвердить доступ</li>
+                                    <li>2. Если видите ошибку, проверьте Redirect URI в настройках приложения Авито</li>
+                                    <li>3. Закройте окно авторизации и попробуйте снова</li>
+                                </ol>
+                            `,
+                            confirmButtonText: 'Понятно',
+                        });
                     }
                 }, 300000); // 5 минут
             } catch (error) {

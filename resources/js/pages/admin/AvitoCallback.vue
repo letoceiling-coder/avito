@@ -5,6 +5,7 @@
                 <div v-if="processing" class="space-y-4">
                     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
                     <p class="text-muted-foreground">Обработка авторизации...</p>
+                    <p class="text-xs text-muted-foreground italic">Пожалуйста, не закрывайте это окно</p>
                 </div>
                 <div v-else-if="error" class="space-y-4">
                     <p class="text-red-600 dark:text-red-400">Ошибка авторизации</p>
@@ -133,40 +134,43 @@ export default {
                         window.opener.postMessage(message, targetOrigin);
                         console.log('✅ Message sent to opener (attempt 1)');
                         
-                        // Отправляем сообщение несколько раз на случай, если первое не дошло
-                        setTimeout(() => {
+                        // Отправляем сообщение несколько раз с разными интервалами
+                        // Это увеличивает шанс, что сообщение будет получено
+                        const sendMessage = () => {
                             if (window.opener && !window.opener.closed) {
-                                console.log('📤 Resending message (retry 1)');
                                 window.opener.postMessage(message, targetOrigin);
-                            } else {
-                                console.warn('⚠️ Opener closed during retry 1');
+                                return true;
                             }
-                        }, 300);
+                            return false;
+                        };
                         
-                        setTimeout(() => {
-                            if (window.opener && !window.opener.closed) {
-                                console.log('📤 Resending message (retry 2)');
-                                window.opener.postMessage(message, targetOrigin);
-                            } else {
-                                console.warn('⚠️ Opener closed during retry 2');
-                            }
-                        }, 600);
+                        // Отправляем сообщения с интервалами: 100ms, 300ms, 500ms, 1s, 2s, 3s
+                        const intervals = [100, 300, 500, 1000, 2000, 3000];
+                        let sentCount = 1;
                         
-                        setTimeout(() => {
-                            if (window.opener && !window.opener.closed) {
-                                console.log('📤 Resending message (retry 3)');
-                                window.opener.postMessage(message, targetOrigin);
-                            } else {
-                                console.warn('⚠️ Opener closed during retry 3');
-                            }
-                        }, 1000);
+                        intervals.forEach((delay, index) => {
+                            setTimeout(() => {
+                                if (sendMessage()) {
+                                    sentCount++;
+                                    console.log(`📤 Message sent (retry ${index + 1}, total: ${sentCount})`);
+                                } else {
+                                    console.warn(`⚠️ Opener closed during retry ${index + 1}`);
+                                }
+                            }, delay);
+                        });
                         
                         // Показываем успех перед закрытием
                         this.processing = false;
                         
+                        // Увеличиваем время перед закрытием, чтобы дать больше времени на отправку
                         setTimeout(() => {
+                            if (window.opener && !window.opener.closed) {
+                                // Последняя попытка перед закрытием
+                                sendMessage();
+                                console.log('📤 Final message sent before closing');
+                            }
                             this.closeWindow();
-                        }, 1500);
+                        }, 4000); // Увеличено с 1500ms до 4000ms
                     } catch (e) {
                         console.error('Error sending message:', e);
                         this.error = 'Ошибка отправки сообщения: ' + e.message;
