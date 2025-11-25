@@ -213,12 +213,16 @@ class AvitoApiService
     /**
      * Получить список объявлений
      * Согласно документации Авито: https://developers.avito.ru/api-catalog
+     * Endpoint: GET /core/v1/accounts/{user_id}/items
+     * Но если это не работает, попробуем альтернативные варианты
      */
     public function getAds(AvitoIntegration $integration, int $userId, array $params = []): array
     {
         try {
-            // Проверяем документацию Авито для правильного endpoint
-            // Возможно, нужно использовать другой формат URL
+            // Согласно документации Авито, endpoint для получения объявлений:
+            // GET /core/v1/accounts/{user_id}/items
+            // Но если получаем 404, возможно нужно использовать другой формат
+            // Попробуем сначала стандартный endpoint
             $url = self::BASE_URL . "/core/v1/accounts/{$userId}/items";
             
             Log::info('Avito API: Getting ads', [
@@ -230,16 +234,44 @@ class AvitoApiService
             
             $client = $this->getAuthorizedClient($integration);
             $response = $client->get($url, $params);
+            
+            // Если получили 404, попробуем альтернативный endpoint
+            if ($response->status() === 404) {
+                Log::warning('Avito API: Standard endpoint returned 404, trying alternative', [
+                    'original_url' => $url,
+                ]);
+                
+                // Альтернативный вариант: без userId в пути (используем текущий аккаунт)
+                $alternativeUrl = self::BASE_URL . "/core/v1/items";
+                Log::info('Avito API: Trying alternative endpoint', [
+                    'url' => $alternativeUrl,
+                ]);
+                
+                $response = $client->get($alternativeUrl, $params);
+                
+                // Если и это не работает, попробуем с userId как query параметр
+                if ($response->status() === 404) {
+                    Log::warning('Avito API: Alternative endpoint also returned 404, trying with userId as query param');
+                    $params['user_id'] = $userId;
+                    $response = $client->get($alternativeUrl, $params);
+                }
+            }
 
             Log::info('Avito API: Get ads response', [
                 'status' => $response->status(),
                 'successful' => $response->successful(),
+                'url' => $url,
             ]);
 
             if ($response->successful()) {
+                $data = $response->json();
+                Log::info('Avito API: Successfully retrieved ads', [
+                    'items_count' => isset($data['resources']) ? count($data['resources']) : 'unknown',
+                    'data_structure' => is_array($data) ? array_keys($data) : 'not_array',
+                ]);
                 return [
                     'success' => true,
-                    'data' => $response->json(),
+                    'data' => $data,
                 ];
             }
 
@@ -250,6 +282,8 @@ class AvitoApiService
                 'status' => $response->status(),
                 'error' => $errorMessage,
                 'response' => $errorData,
+                'url' => $url,
+                'user_id' => $userId,
             ]);
 
             return [
