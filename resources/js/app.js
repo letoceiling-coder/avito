@@ -274,6 +274,11 @@ const routes = [
                 name: 'admin.avito.mass-posting',
                 component: () => import('./pages/admin/AvitoMassPosting.vue'),
             },
+            {
+                path: 'avito/generator',
+                name: 'admin.avito.generator',
+                component: () => import('./pages/admin/AvitoAdGenerator.vue'),
+            },
         ],
     },
 ];

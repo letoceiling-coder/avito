@@ -112,6 +112,12 @@ class AdminMenu
                         'icon' => 'upload',
                         'roles' => ['admin', 'manager'],
                     ],
+                    [
+                        'title' => 'Генератор объявлений',
+                        'route' => 'admin.avito.generator',
+                        'icon' => 'sparkles',
+                        'roles' => ['admin', 'manager'],
+                    ],
                 ],
             ],
         ]);

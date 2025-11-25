@@ -77,6 +77,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('ads/mass-create', [AvitoAdsController::class, 'massCreate']);
         Route::get('categories', [AvitoAdsController::class, 'getCategories']);
         Route::get('locations', [AvitoAdsController::class, 'getLocations']);
+
+        // Ad Generator
+        Route::prefix('generator')->group(function () {
+            Route::get('ads', [\App\Http\Controllers\Api\AvitoAdGeneratorController::class, 'index']);
+            Route::get('ads/{id}', [\App\Http\Controllers\Api\AvitoAdGeneratorController::class, 'show']);
+            Route::post('generate', [\App\Http\Controllers\Api\AvitoAdGeneratorController::class, 'generate']);
+            Route::delete('ads/{id}', [\App\Http\Controllers\Api\AvitoAdGeneratorController::class, 'destroy']);
+        });
     });
 });
 
