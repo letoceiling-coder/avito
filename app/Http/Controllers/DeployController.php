@@ -127,6 +127,18 @@ class DeployController extends Controller
             $composerPath = $this->findComposer($log);
             $log[] = "Используется composer: {$composerPath}";
             
+            // Проверяем, что файл действительно существует перед выполнением
+            if (preg_match('/^php\s+(.+)$/', $composerPath, $matches)) {
+                $composerFile = trim($matches[1]);
+                $log[] = "Проверка существования файла: {$composerFile}";
+                $log[] = "file_exists(): " . (file_exists($composerFile) ? 'да' : 'нет');
+                $log[] = "is_readable(): " . (is_readable($composerFile) ? 'да' : 'нет');
+                if (file_exists($composerFile)) {
+                    $log[] = "Размер файла: " . filesize($composerFile) . " байт";
+                    $log[] = "Права доступа: " . substr(sprintf('%o', fileperms($composerFile)), -4);
+                }
+            }
+            
             // Выполняем команду composer (мы уже в корне проекта)
             // Используем параметры из требований: --no-interaction --prefer-dist --optimize-autoloader
             $composerResult = $this->executeCommand("{$composerPath} install --no-interaction --prefer-dist --optimize-autoloader 2>&1", $log);
@@ -408,13 +420,15 @@ class DeployController extends Controller
         
         // Логируем для отладки
         if ($log !== null) {
-            $log[] = "Поиск composer...";
+            $log[] = "=== Поиск composer ===";
             if ($homeDir) {
                 $log[] = "HOME найден: {$homeDir}";
             } else {
                 $log[] = "HOME не найден";
             }
             $log[] = "Пользователь: {$user}";
+            $log[] = "get_current_user(): {$user}";
+            $log[] = "posix_geteuid(): " . (function_exists('posix_geteuid') ? posix_geteuid() : 'недоступно');
         }
         
         // Проверяем различные возможные пути
