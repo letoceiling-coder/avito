@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AvitoIntegration;
+use App\Models\AvitoGeneratedAd;
 use App\Services\AvitoApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -204,16 +205,20 @@ class AvitoAdsController extends Controller
 
     /**
      * Массовое создание объявлений по городам
+     * Поддерживает два режима:
+     * 1. Использование сгенерированного объявления (generated_ad_id)
+     * 2. Использование шаблона (template) - для обратной совместимости
      */
     public function massCreate(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'template' => 'required|array',
-            'template.title' => 'required|string|max:255',
-            'template.description' => 'required|string',
-            'template.category_id' => 'required|integer',
-            'template.price' => 'required|numeric|min:0',
-            'template.contact_phone' => 'required|string',
+            'generated_ad_id' => 'sometimes|integer|exists:avito_generated_ads,id',
+            'template' => 'sometimes|array',
+            'template.title' => 'required_with:template|string|max:255',
+            'template.description' => 'required_with:template|string',
+            'template.category_id' => 'required_with:template|integer',
+            'template.price' => 'required_with:template|numeric|min:0',
+            'template.contact_phone' => 'required_with:template|string',
             'template.images' => 'sometimes|array',
             'cities' => 'required|array|min:1',
             'cities.*' => 'required|integer',
@@ -252,8 +257,54 @@ class AvitoAdsController extends Controller
             ], 400);
         }
 
+        // Определяем источник данных объявления
+        $template = null;
+        
+        if ($request->has('generated_ad_id')) {
+            // Используем сгенерированное объявление
+            $generatedAd = \App\Models\AvitoGeneratedAd::where('user_id', $request->user()->id)
+                ->findOrFail($request->generated_ad_id);
+            
+            // Преобразуем локальные пути изображений в полные URL
+            $images = [];
+            if ($generatedAd->images && is_array($generatedAd->images)) {
+                foreach ($generatedAd->images as $image) {
+                    if (is_string($image)) {
+                        // Если путь локальный, преобразуем в полный URL
+                        if (str_starts_with($image, '/storage/')) {
+                            $images[] = url($image);
+                        } elseif (!str_starts_with($image, 'http')) {
+                            $images[] = url('/storage/' . $image);
+                        } else {
+                            $images[] = $image;
+                        }
+                    }
+                }
+            }
+            
+            $template = [
+                'title' => $generatedAd->title,
+                'description' => $generatedAd->description,
+                'category_id' => $generatedAd->category_id,
+                'price' => $generatedAd->price ?? 0,
+                'contact_phone' => $generatedAd->contact_phone ?? '',
+                'images' => $images,
+                'service_type' => 'service',
+                'is_vip' => $generatedAd->is_vip ?? false,
+                'is_premium' => $generatedAd->is_premium ?? false,
+                'is_auto_renew' => $generatedAd->is_auto_renew ?? false,
+            ];
+        } elseif ($request->has('template')) {
+            // Используем шаблон (обратная совместимость)
+            $template = $request->template;
+        } else {
+            return response()->json([
+                'success' => false,
+                'error' => 'Необходимо указать generated_ad_id или template',
+            ], 422);
+        }
+
         $results = [];
-        $template = $request->template;
         $cities = $request->cities;
 
         foreach ($cities as $cityId) {
@@ -265,7 +316,7 @@ class AvitoAdsController extends Controller
                 'location' => [
                     'city_id' => $cityId,
                 ],
-                'price' => (int)($template['price'] * 100),
+                'price' => (int)($template['price'] * 100), // Цена в копейках
                 'contact' => [
                     'phone' => $template['contact_phone'],
                 ],
@@ -276,6 +327,19 @@ class AvitoAdsController extends Controller
             // Добавляем дополнительные параметры
             if (isset($template['params'])) {
                 $adData = array_merge($adData, $template['params']);
+            }
+
+            // Добавляем флаги VIP, Premium, Auto-renew если они есть
+            if (isset($template['is_vip']) && $template['is_vip']) {
+                $adData['vas'] = $adData['vas'] ?? [];
+                $adData['vas'][] = 'vip';
+            }
+            if (isset($template['is_premium']) && $template['is_premium']) {
+                $adData['vas'] = $adData['vas'] ?? [];
+                $adData['vas'][] = 'premium';
+            }
+            if (isset($template['is_auto_renew']) && $template['is_auto_renew']) {
+                $adData['auto_renew'] = true;
             }
 
             $result = $this->avitoApiService->createAd($integration, $userId, $adData);

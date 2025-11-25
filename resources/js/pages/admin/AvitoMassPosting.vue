@@ -6,92 +6,68 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Форма создания объявления -->
+            <!-- Выбор объявления и городов -->
             <div class="bg-card rounded-lg border border-border p-6">
-                <h2 class="text-xl font-semibold mb-4">Шаблон объявления</h2>
+                <h2 class="text-xl font-semibold mb-4">Выбор объявления и городов</h2>
 
-                <form @submit.prevent="createMassAds" class="space-y-4">
+                <form @submit.prevent="postMassAds" class="space-y-4">
+                    <!-- Выбор объявления -->
                     <div>
-                        <label class="block text-sm font-medium mb-2">Название *</label>
-                        <input
-                            v-model="template.title"
-                            type="text"
+                        <label class="block text-sm font-medium mb-2">Выберите объявление *</label>
+                        <div v-if="loadingAds" class="text-sm text-muted-foreground mb-2">
+                            Загрузка объявлений...
+                        </div>
+                        <select
+                            v-model="selectedAdId"
+                            @change="onAdSelected"
                             class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                            placeholder="Название услуги"
                             required
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Описание *</label>
-                        <textarea
-                            v-model="template.description"
-                            rows="4"
-                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                            placeholder="Подробное описание услуги"
-                            required
-                        ></textarea>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Категория (ID) *</label>
-                        <input
-                            v-model.number="template.category_id"
-                            type="number"
-                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                            placeholder="ID категории из Авито"
-                            required
-                        />
+                            :disabled="loadingAds"
+                        >
+                            <option value="">-- Выберите объявление --</option>
+                            <option v-for="ad in generatedAds" :key="ad.id" :value="ad.id">
+                                {{ ad.title }} ({{ ad.category_name || 'Категория' }})
+                            </option>
+                        </select>
                         <p class="text-xs text-muted-foreground mt-1">
-                            Для сферы услуг обычно: 9 (Услуги)
+                            Выберите объявление из списка сгенерированных объявлений
                         </p>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Цена (руб.) *</label>
-                        <input
-                            v-model.number="template.price"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                            placeholder="0.00"
-                            required
-                        />
+                    <!-- Предпросмотр выбранного объявления -->
+                    <div v-if="selectedAd" class="border border-border rounded-md p-4 bg-muted/30">
+                        <h3 class="font-semibold mb-2">Предпросмотр объявления:</h3>
+                        <div class="space-y-2 text-sm">
+                            <div>
+                                <span class="text-muted-foreground">Название:</span>
+                                <span class="ml-2 font-medium">{{ selectedAd.title }}</span>
+                            </div>
+                            <div>
+                                <span class="text-muted-foreground">Категория:</span>
+                                <span class="ml-2">{{ selectedAd.category_name || 'Не указана' }}</span>
+                            </div>
+                            <div>
+                                <span class="text-muted-foreground">Цена:</span>
+                                <span class="ml-2">{{ selectedAd.price ? formatPrice(selectedAd.price) + ' ₽' : 'Не указана' }}</span>
+                            </div>
+                            <div v-if="selectedAd.images && selectedAd.images.length" class="mt-2">
+                                <span class="text-muted-foreground">Изображений:</span>
+                                <span class="ml-2">{{ selectedAd.images.length }}</span>
+                                <div class="flex gap-2 mt-2">
+                                    <img
+                                        v-for="(img, idx) in selectedAd.images.slice(0, 3)"
+                                        :key="idx"
+                                        :src="getImageUrl(img)"
+                                        :alt="selectedAd.title"
+                                        class="w-16 h-16 object-cover rounded border border-border"
+                                        @error="handleImageError"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Телефон *</label>
-                        <input
-                            v-model="template.contact_phone"
-                            type="tel"
-                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                            placeholder="+7 (999) 123-45-67"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Изображения (URL, по одному на строку)</label>
-                        <textarea
-                            v-model="imagesText"
-                            rows="3"
-                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                            placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
-                        ></textarea>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Тип услуги</label>
-                        <select
-                            v-model="template.service_type"
-                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                        >
-                            <option value="service">Услуга</option>
-                            <option value="master">Мастер</option>
-                        </select>
-                    </div>
-
+                    <!-- Выбор городов -->
                     <div class="border-t border-border pt-4">
                         <h3 class="text-lg font-semibold mb-3">Города для размещения *</h3>
                         
@@ -141,10 +117,10 @@
 
                     <button
                         type="submit"
-                        :disabled="loading || selectedCities.length === 0"
+                        :disabled="loading || selectedCities.length === 0 || !selectedAdId"
                         class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
                     >
-                        {{ loading ? 'Создание объявлений...' : `Создать объявления (${selectedCities.length})` }}
+                        {{ loading ? 'Публикация объявлений...' : `Опубликовать в ${selectedCities.length} ${selectedCities.length === 1 ? 'городе' : 'городах'}` }}
                     </button>
                 </form>
             </div>
@@ -154,11 +130,12 @@
                 <h2 class="text-xl font-semibold mb-4">Результаты</h2>
 
                 <div v-if="!results.length && !loading" class="text-center py-12">
-                    <p class="text-muted-foreground">Результаты появятся здесь после создания объявлений</p>
+                    <p class="text-muted-foreground">Результаты появятся здесь после публикации объявлений</p>
                 </div>
 
                 <div v-else-if="loading" class="text-center py-12">
-                    <p class="text-muted-foreground">Создание объявлений...</p>
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                    <p class="text-muted-foreground">Публикация объявлений...</p>
                 </div>
 
                 <div v-else class="space-y-4">
@@ -196,10 +173,10 @@
                                                 : 'text-red-700 dark:text-red-300'
                                         ]"
                                     >
-                                        {{ result.success ? 'Успешно создано' : result.error }}
+                                        {{ result.success ? 'Успешно опубликовано' : result.error }}
                                     </p>
                                     <p v-if="result.data && result.data.id" class="text-xs text-muted-foreground mt-1">
-                                        ID объявления: {{ result.data.id }}
+                                        ID объявления на Авито: {{ result.data.id }}
                                     </p>
                                 </div>
                                 <a
@@ -227,16 +204,10 @@ export default {
     name: 'AvitoMassPosting',
     data() {
         return {
-            template: {
-                title: '',
-                description: '',
-                category_id: 9, // Услуги по умолчанию
-                price: 0,
-                contact_phone: '',
-                images: [],
-                service_type: 'service',
-            },
-            imagesText: '',
+            generatedAds: [],
+            selectedAdId: '',
+            selectedAd: null,
+            loadingAds: false,
             selectedCities: [],
             citySearch: '',
             foundCities: [],
@@ -253,7 +224,48 @@ export default {
             return this.results.filter(r => !r.success).length;
         },
     },
+    mounted() {
+        this.loadGeneratedAds();
+        this.loadLocations();
+    },
     methods: {
+        async loadGeneratedAds() {
+            this.loadingAds = true;
+            try {
+                const response = await axios.get('/api/avito/generator/ads');
+                if (response.data.success) {
+                    const data = response.data.data || {};
+                    this.generatedAds = data.items || data.data || data || [];
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки объявлений:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Ошибка',
+                    text: 'Не удалось загрузить список объявлений',
+                });
+            } finally {
+                this.loadingAds = false;
+            }
+        },
+        onAdSelected() {
+            if (this.selectedAdId) {
+                this.selectedAd = this.generatedAds.find(ad => ad.id == this.selectedAdId);
+            } else {
+                this.selectedAd = null;
+            }
+        },
+        async loadLocations() {
+            try {
+                const response = await axios.get('/api/avito/locations');
+                if (response.data.success) {
+                    const data = response.data.data || {};
+                    this.allLocations = data.locations || data.data || [];
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки городов:', error);
+            }
+        },
         async searchCities() {
             if (!this.citySearch || this.citySearch.length < 2) {
                 this.foundCities = [];
@@ -267,7 +279,8 @@ export default {
                 });
 
                 if (response.data.success) {
-                    this.foundCities = response.data.data.locations || [];
+                    const data = response.data.data || {};
+                    this.foundCities = data.locations || data.data || [];
                 } else {
                     this.foundCities = [];
                 }
@@ -292,7 +305,25 @@ export default {
             const city = this.selectedCities.find(c => c.id === cityId);
             return city ? city.name : `Город ID: ${cityId}`;
         },
-        async createMassAds() {
+        formatPrice(price) {
+            return new Intl.NumberFormat('ru-RU').format(price);
+        },
+        getImageUrl(img) {
+            if (img && img.startsWith('http')) {
+                return img;
+            }
+            if (img && img.startsWith('/storage')) {
+                return window.location.origin + img;
+            }
+            if (img && !img.startsWith('/')) {
+                return window.location.origin + '/storage/' + img;
+            }
+            return img || '';
+        },
+        handleImageError(event) {
+            event.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23ddd" width="200" height="200"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EИзображение%3C/text%3E%3C/svg%3E';
+        },
+        async postMassAds() {
             if (this.selectedCities.length === 0) {
                 await Swal.fire({
                     icon: 'warning',
@@ -302,20 +333,33 @@ export default {
                 return;
             }
 
+            if (!this.selectedAdId) {
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Внимание',
+                    text: 'Выберите объявление для публикации',
+                });
+                return;
+            }
+
+            const confirm = await Swal.fire({
+                title: 'Подтверждение',
+                text: `Вы уверены, что хотите опубликовать объявление в ${this.selectedCities.length} ${this.selectedCities.length === 1 ? 'городе' : 'городах'}?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Да, опубликовать',
+                cancelButtonText: 'Отмена',
+            });
+
+            if (!confirm.isConfirmed) {
+                return;
+            }
+
             this.loading = true;
             this.results = [];
 
-            // Парсим изображения
-            const images = this.imagesText
-                .split('\n')
-                .map(url => url.trim())
-                .filter(url => url && url.startsWith('http'));
-
             const data = {
-                template: {
-                    ...this.template,
-                    images: images,
-                },
+                generated_ad_id: this.selectedAdId,
                 cities: this.selectedCities.map(c => c.id),
             };
 
@@ -328,20 +372,21 @@ export default {
                     await Swal.fire({
                         icon: 'success',
                         title: 'Готово',
-                        text: `Создано ${response.data.success_count} из ${response.data.total} объявлений`,
+                        text: `Опубликовано ${response.data.success_count} из ${response.data.total} объявлений`,
                     });
                 } else {
                     await Swal.fire({
                         icon: 'error',
                         title: 'Ошибка',
-                        text: response.data.error || 'Не удалось создать объявления',
+                        text: response.data.error || 'Не удалось опубликовать объявления',
                     });
                 }
             } catch (error) {
+                console.error('Ошибка публикации:', error);
                 await Swal.fire({
                     icon: 'error',
                     title: 'Ошибка',
-                    text: error.response?.data?.message || 'Ошибка при создании объявлений',
+                    text: error.response?.data?.message || 'Ошибка при публикации объявлений',
                 });
             } finally {
                 this.loading = false;
@@ -350,4 +395,3 @@ export default {
     },
 };
 </script>
-
