@@ -221,25 +221,39 @@ class AvitoIntegrationController extends Controller
 
         $redirectUri = $request->input('redirect_uri', url('/admin/avito/callback'));
         
+        // Убеждаемся, что redirect_uri правильно закодирован и не содержит лишних символов
+        $redirectUri = rtrim($redirectUri, '/');
+        
         // Логируем для отладки
         \Log::info('Avito OAuth URL generation', [
             'client_id' => $integration->client_id,
             'redirect_uri' => $redirectUri,
+            'full_url' => url('/admin/avito/callback'),
         ]);
         
-        // Согласно документации Авито, URL может быть:
-        // https://www.avito.ru/oauth или https://api.avito.ru/oauth
-        // Попробуем оба варианта, но начнем с www.avito.ru
-        $authUrl = 'https://www.avito.ru/oauth?' . http_build_query([
+        // Согласно документации Авито API, OAuth endpoint:
+        // https://www.avito.ru/oauth
+        // Параметры должны быть правильно закодированы
+        $params = [
             'response_type' => 'code',
             'client_id' => $integration->client_id,
             'redirect_uri' => $redirectUri,
-            'scope' => 'items:read items:write',
+        ];
+        
+        // Scope может быть строкой или массивом, но лучше передавать как строку
+        $scope = 'items:read items:write';
+        $params['scope'] = $scope;
+        
+        $authUrl = 'https://www.avito.ru/oauth?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+
+        \Log::info('Avito OAuth URL generated', [
+            'auth_url' => $authUrl,
         ]);
 
         return response()->json([
             'auth_url' => $authUrl,
             'redirect_uri' => $redirectUri, // Возвращаем для отладки
+            'client_id' => $integration->client_id, // Для проверки
         ]);
     }
 }

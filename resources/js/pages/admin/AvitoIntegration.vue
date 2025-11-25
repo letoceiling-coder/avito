@@ -11,12 +11,19 @@
             
             <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                 <p class="text-sm text-blue-800 dark:text-blue-200 mb-2">
-                    <strong>Инструкция:</strong>
+                    <strong>Важно! Инструкция по настройке:</strong>
                 </p>
-                <ol class="text-sm text-blue-700 dark:text-blue-300 list-decimal list-inside space-y-1">
-                    <li>Получите Client ID и Client Secret в <a href="https://developers.avito.ru/applications" target="_blank" class="underline">личном кабинете разработчика Авито</a></li>
-                    <li>В настройках приложения укажите Redirect URI: <code class="bg-blue-100 dark:bg-blue-800 px-1 rounded">{{ windowLocation }}/admin/avito/callback</code></li>
+                <ol class="text-sm text-blue-700 dark:text-blue-300 list-decimal list-inside space-y-2">
+                    <li>Получите Client ID и Client Secret в <a href="https://developers.avito.ru/applications" target="_blank" class="underline font-semibold">личном кабинете разработчика Авито</a></li>
+                    <li>
+                        <strong>КРИТИЧЕСКИ ВАЖНО:</strong> В настройках приложения Авито укажите Redirect URI точно так:
+                        <div class="mt-1 p-2 bg-blue-100 dark:bg-blue-800 rounded font-mono text-xs break-all">
+                            {{ windowLocation }}/admin/avito/callback
+                        </div>
+                        <p class="mt-1 text-xs italic">Redirect URI должен совпадать <strong>ТОЧНО</strong>, включая протокол (http/https) и путь!</p>
+                    </li>
                     <li>Сохраните настройки ниже и нажмите "Авторизоваться через OAuth"</li>
+                    <li>Если видите ошибку "Что-то пошло не так", проверьте, что Redirect URI в настройках Авито совпадает с указанным выше</li>
                 </ol>
             </div>
             
@@ -189,9 +196,14 @@ export default {
         },
         async authorize() {
             try {
+                // Формируем redirect_uri точно так же, как он должен быть в настройках приложения Авито
+                const redirectUri = window.location.origin + '/admin/avito/callback';
+                
+                console.log('Requesting auth URL with redirect_uri:', redirectUri);
+                
                 const response = await axios.get('/api/avito/integration/auth-url', {
                     params: {
-                        redirect_uri: window.location.origin + '/admin/avito/callback',
+                        redirect_uri: redirectUri,
                     },
                 });
 
@@ -199,7 +211,34 @@ export default {
                     throw new Error('URL авторизации не получен');
                 }
 
-                console.log('Opening auth URL:', response.data.auth_url);
+                console.log('Auth URL received:', response.data.auth_url);
+                console.log('Redirect URI:', response.data.redirect_uri);
+                console.log('Client ID:', response.data.client_id);
+                
+                // Показываем информацию о redirect_uri для проверки
+                const redirectUriInfo = `
+                    <div style="text-align: left; margin: 10px 0;">
+                        <p><strong>Проверьте настройки приложения Авито:</strong></p>
+                        <p style="margin: 5px 0;">Redirect URI должен быть точно таким:</p>
+                        <code style="background: #f0f0f0; padding: 8px; border-radius: 4px; display: block; word-break: break-all; margin: 5px 0;">${response.data.redirect_uri}</code>
+                        <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                            Если видите ошибку "Что-то пошло не так", скорее всего Redirect URI в настройках Авито не совпадает с указанным выше.
+                        </p>
+                    </div>
+                `;
+                
+                const confirm = await Swal.fire({
+                    icon: 'info',
+                    title: 'Перед авторизацией',
+                    html: redirectUriInfo,
+                    confirmButtonText: 'Продолжить',
+                    showCancelButton: true,
+                    cancelButtonText: 'Отмена',
+                });
+                
+                if (!confirm.isConfirmed) {
+                    return;
+                }
                 
                 // Открываем окно авторизации
                 const authWindow = window.open(

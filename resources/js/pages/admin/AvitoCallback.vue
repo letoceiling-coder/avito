@@ -49,8 +49,16 @@ export default {
             const code = urlParams.get('code');
             const error = urlParams.get('error');
             const errorDescription = urlParams.get('error_description');
+            const state = urlParams.get('state');
 
-            console.log('Callback received:', { code, error, errorDescription });
+            console.log('Callback received:', { 
+                code: code ? 'present' : 'missing', 
+                error, 
+                errorDescription,
+                state,
+                fullUrl: window.location.href,
+                search: window.location.search
+            });
 
             if (error) {
                 this.error = errorDescription || error;
