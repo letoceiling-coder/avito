@@ -288,34 +288,75 @@ class AvitoAdGeneratorController extends Controller
                 ]);
 
                 // Сохраняем объявление в БД
-                $ad = AvitoGeneratedAd::create([
-                    'user_id' => $request->user()->id,
-                    'title' => $adData['title'] ?? 'Без названия',
-                    'description' => $adData['description'] ?? '',
-                    'category_id' => $request->category_id,
-                    'category_name' => $categoryName,
-                    'location_id' => $request->location_id,
-                    'location_name' => $locationName,
-                    'address' => $request->address,
-                    'price' => $request->price,
-                    'contact_phone' => $request->contact_phone,
-                    'images' => $images,
-                    'condition' => $request->condition,
-                    'is_vip' => $request->boolean('is_vip', false),
-                    'is_premium' => $request->boolean('is_premium', false),
-                    'is_auto_renew' => $request->boolean('is_auto_renew', false),
-                    'status' => 'ready',
-                    'generation_topic' => $request->topic,
-                    'generation_prompt' => $textResult['raw_response'] ?? null,
-                    'generation_settings' => $settings,
+                Log::info('Saving ad to database', [
+                    'has_title' => !empty($adData['title']),
+                    'has_description' => !empty($adData['description']),
+                    'images_count' => count($images),
+                    'iteration' => $i + 1,
                 ]);
+                
+                try {
+                    // Обрезаем тему, если она слишком длинная (на всякий случай, хотя поле теперь text)
+                    $generationTopic = $request->topic;
+                    if (strlen($generationTopic) > 65535) {
+                        $generationTopic = substr($generationTopic, 0, 65535);
+                        Log::warning('Generation topic truncated', [
+                            'original_length' => strlen($request->topic),
+                            'truncated_length' => strlen($generationTopic),
+                        ]);
+                    }
+                    
+                    $ad = AvitoGeneratedAd::create([
+                        'user_id' => $request->user()->id,
+                        'title' => $adData['title'] ?? 'Без названия',
+                        'description' => $adData['description'] ?? '',
+                        'category_id' => $request->category_id,
+                        'category_name' => $categoryName,
+                        'location_id' => $request->location_id,
+                        'location_name' => $locationName,
+                        'address' => $request->address,
+                        'price' => $request->price,
+                        'contact_phone' => $request->contact_phone,
+                        'images' => $images, // Может быть пустым, если достигнут лимит биллинга
+                        'condition' => $request->condition,
+                        'is_vip' => $request->boolean('is_vip', false),
+                        'is_premium' => $request->boolean('is_premium', false),
+                        'is_auto_renew' => $request->boolean('is_auto_renew', false),
+                        'status' => 'ready',
+                        'generation_topic' => $generationTopic,
+                        'generation_prompt' => $textResult['raw_response'] ?? null,
+                        'generation_settings' => $settings,
+                    ]);
+                    
+                    Log::info('Ad saved successfully', [
+                        'ad_id' => $ad->id,
+                        'iteration' => $i + 1,
+                    ]);
 
-                $generatedAds[] = $ad;
+                    $generatedAds[] = $ad;
+                } catch (Exception $e) {
+                    Log::error('Exception when saving ad to database', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'iteration' => $i + 1,
+                    ]);
+                    // Продолжаем генерацию других объявлений
+                    continue;
+                }
 
                 // Небольшая задержка между генерациями
                 if ($i < $count - 1) {
                     sleep(1);
                 }
+            } catch (Exception $e) {
+                Log::error('Exception when saving ad to database', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'iteration' => $i + 1,
+                ]);
+                // Продолжаем генерацию других объявлений
+                continue;
+            }
             }
 
             // Если не было сгенерировано ни одного объявления, возвращаем ошибку

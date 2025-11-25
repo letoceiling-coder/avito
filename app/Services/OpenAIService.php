@@ -143,14 +143,24 @@ class OpenAIService
             }
 
             $errorData = $response->json();
-            Log::error('OpenAI: Error generating image', [
+            $errorMessage = $errorData['error']['message'] ?? 'Ошибка генерации изображения';
+            $errorCode = $errorData['error']['code'] ?? null;
+            
+            // Специальная обработка для лимита биллинга
+            if ($errorCode === 'billing_hard_limit_reached') {
+                $errorMessage = 'Достигнут лимит биллинга OpenAI. Изображения не будут сгенерированы, но объявление можно сохранить без них.';
+            }
+            
+            Log::warning('OpenAI: Error generating image', [
                 'status' => $response->status(),
                 'error' => $errorData,
+                'error_code' => $errorCode,
             ]);
 
             return [
                 'success' => false,
-                'error' => $errorData['error']['message'] ?? 'Ошибка генерации изображения',
+                'error' => $errorMessage,
+                'error_code' => $errorCode,
             ];
         } catch (Exception $e) {
             Log::error('OpenAI: Exception in generateImage', [

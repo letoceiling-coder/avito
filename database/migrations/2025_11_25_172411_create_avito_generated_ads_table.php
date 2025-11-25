@@ -43,7 +43,7 @@ return new class extends Migration
             $table->string('avito_item_id')->nullable(); // ID объявления на Авито после публикации
             
             // Метаданные генерации
-            $table->string('generation_topic')->nullable(); // Тема для генерации
+            $table->text('generation_topic')->nullable(); // Тема для генерации (может быть длинной)
             $table->text('generation_prompt')->nullable(); // Промпт, использованный для генерации
             $table->json('generation_settings')->nullable(); // Настройки генерации (количество фото и т.д.)
             
