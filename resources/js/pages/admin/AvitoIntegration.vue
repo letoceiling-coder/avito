@@ -276,11 +276,12 @@ export default {
 
                 // Слушаем сообщения от окна авторизации
                 const messageListener = async (event) => {
-                    console.log('Message received:', {
+                    console.log('📨 Message received:', {
                         origin: event.origin,
                         data: event.data,
                         dataType: event.data?.type,
-                        hasCode: !!event.data?.code
+                        hasCode: !!event.data?.code,
+                        fullData: event.data
                     });
                     
                     const currentOrigin = window.location.origin;
@@ -290,29 +291,50 @@ export default {
                     const isOurDomain = event.origin === currentOrigin || 
                                        event.origin.includes(currentHostname);
                     
-                    // Принимаем сообщения от Авито (www.avito.ru, avito.ru)
-                    const isAvitoDomain = event.origin.includes('avito.ru');
+                    // ВАЖНО: Принимаем сообщения от Авито (www.avito.ru, avito.ru)
+                    // Авито может отправлять сообщения напрямую
+                    const isAvitoDomain = event.origin.includes('avito.ru') || 
+                                        event.origin === 'https://www.avito.ru' ||
+                                        event.origin === 'https://avito.ru';
                     
                     // ПРИНИМАЕМ сообщения от Авито ИЛИ от нашего домена
                     const shouldAccept = isOurDomain || isAvitoDomain;
                     
-                    console.log('Origin check:', {
+                    console.log('🔍 Origin check:', {
                         eventOrigin: event.origin,
                         currentOrigin: currentOrigin,
+                        currentHostname: currentHostname,
                         isOurDomain: isOurDomain,
                         isAvitoDomain: isAvitoDomain,
                         shouldAccept: shouldAccept
                     });
                     
-                    if (!shouldAccept) {
-                        console.warn('❌ Origin rejected:', event.origin);
+                    // ВАЖНО: Если сообщение от Авито, принимаем его независимо от других проверок
+                    if (isAvitoDomain) {
+                        console.log('✅ AVITO DOMAIN DETECTED - Accepting message from:', event.origin);
+                    } else if (!shouldAccept) {
+                        console.warn('❌ Origin rejected:', event.origin, 'not our domain and not Avito');
+                        return;
+                    } else {
+                        console.log('✅ Origin ACCEPTED (our domain):', event.origin);
+                    }
+                    
+                    // Проверяем данные сообщения
+                    if (!event.data) {
+                        console.log('⚠️ Message has no data, ignoring');
                         return;
                     }
                     
-                    console.log('✅ Origin ACCEPTED:', event.origin);
+                    console.log('📋 Processing message data:', {
+                        type: event.data.type,
+                        hasCode: !!event.data.code,
+                        hasError: !!event.data.error,
+                        keys: Object.keys(event.data)
+                    });
                     
-                    if (event.data && event.data.type === 'avito-auth-success' && event.data.code) {
-                        console.log('Auth success, code received');
+                    // Обрабатываем успешную авторизацию
+                    if (event.data.type === 'avito-auth-success' && event.data.code) {
+                        console.log('✅ Auth success, code received:', event.data.code.substring(0, 10) + '...');
                         window.removeEventListener('message', messageListener);
                         clearInterval(checkClosed);
                         
@@ -322,7 +344,7 @@ export default {
                         
                         // Сохраняем токены
                         await this.saveTokens(event.data.code);
-                    } else if (event.data && event.data.type === 'avito-auth-error') {
+                    } else if (event.data.type === 'avito-auth-error') {
                         console.error('Auth error:', event.data.error);
                         window.removeEventListener('message', messageListener);
                         clearInterval(checkClosed);
