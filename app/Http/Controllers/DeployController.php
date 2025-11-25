@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Symfony\Component\Process\Process;
 
 class DeployController extends Controller
 {
@@ -141,7 +142,41 @@ class DeployController extends Controller
             
             // Выполняем команду composer (мы уже в корне проекта)
             // Используем параметры из требований: --no-interaction --prefer-dist --optimize-autoloader
-            $composerResult = $this->executeCommand("{$composerPath} install --no-interaction --prefer-dist --optimize-autoloader 2>&1", $log);
+            // Пробуем использовать Process для более надежного выполнения
+            if (preg_match('/^php\s+(.+)$/', $composerPath, $matches)) {
+                $composerFile = trim($matches[1]);
+                $log[] = "Использование Process для выполнения composer...";
+                
+                // Используем Process для надежного выполнения
+                $process = new Process([
+                    'php',
+                    $composerFile,
+                    'install',
+                    '--no-interaction',
+                    '--prefer-dist',
+                    '--optimize-autoloader'
+                ]);
+                $process->setWorkingDirectory(getcwd());
+                $process->setTimeout(600); // 10 минут
+                $process->run();
+                
+                $output = $process->getOutput();
+                $errorOutput = $process->getErrorOutput();
+                $returnCode = $process->getExitCode();
+                
+                if (!empty($output)) {
+                    $log = array_merge($log, explode("\n", trim($output)));
+                }
+                if (!empty($errorOutput)) {
+                    $log = array_merge($log, explode("\n", trim($errorOutput)));
+                }
+                
+                $composerResult = ['output' => array_merge(explode("\n", trim($output)), explode("\n", trim($errorOutput))), 'code' => $returnCode];
+            } else {
+                // Fallback на старый способ
+                $log[] = "Использование exec() для выполнения composer...";
+                $composerResult = $this->executeCommand("{$composerPath} install --no-interaction --prefer-dist --optimize-autoloader 2>&1", $log);
+            }
             
             if ($composerResult['code'] !== 0) {
                 $log[] = "Предупреждение: Ошибка при установке зависимостей через composer";
