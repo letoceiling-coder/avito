@@ -379,13 +379,30 @@ class Deploy extends Command
                 $nodeModulesBin = base_path('node_modules/.bin');
                 if (is_dir($nodeModulesBin)) {
                     try {
+                        // Пробуем установить права через chmod
                         $chmodProcess = new SymfonyProcess(['chmod', '-R', '+x', $nodeModulesBin]);
                         $chmodProcess->run();
+                        
+                        // Также пробуем установить права конкретно на vite и npx
+                        $vitePath = $nodeModulesBin . '/vite';
+                        $npxPath = $nodeModulesBin . '/npx';
+                        
+                        if (file_exists($vitePath)) {
+                            $viteChmod = new SymfonyProcess(['chmod', '+x', $vitePath]);
+                            $viteChmod->run();
+                        }
+                        
+                        if (file_exists($npxPath)) {
+                            $npxChmod = new SymfonyProcess(['chmod', '+x', $npxPath]);
+                            $npxChmod->run();
+                        }
+                        
                         if ($chmodProcess->isSuccessful()) {
                             $this->line('   ✓ Права на выполнение установлены для node_modules/.bin');
                         }
                     } catch (\Exception $e) {
                         // Игнорируем ошибки chmod, продолжаем сборку
+                        $this->warn('   ⚠️  Не удалось установить права автоматически, пробуем npx напрямую...');
                     }
                 }
                 
@@ -407,6 +424,7 @@ class Deploy extends Command
                     } else {
                         // Пробуем сначала build, потом prod (если есть и build не удался)
                         if ($hasBuild) {
+                            // Сначала пробуем npm run build
                             if ($nvmCommand) {
                                 $result = Process::run("{$nvmCommand} && npm run build");
                             } else {
@@ -420,8 +438,42 @@ class Deploy extends Command
                                 $buildSuccess = true;
                             } else {
                                 $this->warn('⚠️  npm run build не удался');
-                                $this->line('   Вывод: ' . substr($buildError ?: $buildOutput, 0, 200));
-                                if ($hasProd) {
+                                $errorPreview = substr($buildError ?: $buildOutput, 0, 200);
+                                $this->line('   Вывод: ' . $errorPreview);
+                                
+                                // Если ошибка связана с правами на vite, пробуем npx напрямую
+                                $isPermissionError = strpos($buildError, 'Permission denied') !== false || 
+                                                    strpos($buildError, 'vite') !== false ||
+                                                    strpos($buildOutput, 'Permission denied') !== false;
+                                
+                                if ($isPermissionError) {
+                                    $this->warn('   Обнаружена ошибка прав доступа, пробуем npx vite build напрямую...');
+                                    
+                                    if ($nvmCommand) {
+                                        $result = Process::run("{$nvmCommand} && npx vite build");
+                                    } else {
+                                        $result = Process::run('npx vite build');
+                                    }
+                                    
+                                    $buildOutput = $result->output();
+                                    $buildError = $result->errorOutput();
+                                    
+                                    if ($result->successful()) {
+                                        $buildSuccess = true;
+                                        $this->info('   ✅ Сборка выполнена через npx vite build');
+                                    } else {
+                                        $this->error('   ❌ npx vite build также не удался');
+                                        $this->line('   Ошибка: ' . substr($buildError ?: $buildOutput, 0, 300));
+                                        
+                                        if ($hasProd) {
+                                            $this->warn('   Пробуем npm run prod...');
+                                        } else {
+                                            // Если prod нет, показываем полную ошибку
+                                            $this->error('   Ошибка сборки:');
+                                            $this->line($buildError ?: $buildOutput);
+                                        }
+                                    }
+                                } elseif ($hasProd) {
                                     $this->warn('   Пробуем npm run prod...');
                                 } else {
                                     // Если prod нет, показываем полную ошибку
