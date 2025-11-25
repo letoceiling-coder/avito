@@ -53,31 +53,40 @@ class DeployController extends Controller
             // Проверяем, является ли директория git репозиторием
             $currentDir = getcwd();
             $log[] = "Текущая директория: {$currentDir}";
+            $log[] = "base_path(): " . base_path();
+            $log[] = "Содержимое директории (первые 10 файлов): " . implode(', ', array_slice(scandir('.'), 0, 10));
             
             // Проверяем несколькими способами
             $isGitRepo = false;
             
             // Способ 1: Проверка директории .git
-            if (is_dir('.git') || is_dir($currentDir . '/.git')) {
+            $gitDir = '.git';
+            $gitDirAbs = $currentDir . '/.git';
+            $log[] = "Проверка .git: относительный '{$gitDir}' = " . (is_dir($gitDir) ? 'существует' : 'не существует');
+            $log[] = "Проверка .git: абсолютный '{$gitDirAbs}' = " . (is_dir($gitDirAbs) ? 'существует' : 'не существует');
+            
+            if (is_dir('.git') || is_dir($gitDirAbs)) {
                 $isGitRepo = true;
-                $log[] = "Git репозиторий найден через проверку директории .git";
+                $log[] = "✓ Git репозиторий найден через проверку директории .git";
             }
             
             // Способ 2: Проверка через git rev-parse
             if (!$isGitRepo) {
                 $gitCheck = $this->executeCommand('git rev-parse --git-dir 2>&1', $gitCheckLog);
+                $log[] = "git rev-parse --git-dir: код = {$gitCheck['code']}, вывод = " . implode(' | ', array_slice($gitCheck['output'], 0, 3));
                 if ($gitCheck['code'] === 0 && !empty($gitCheck['output'])) {
                     $isGitRepo = true;
-                    $log[] = "Git репозиторий найден через git rev-parse";
+                    $log[] = "✓ Git репозиторий найден через git rev-parse";
                 }
             }
             
             // Способ 3: Проверка через git status
             if (!$isGitRepo) {
                 $gitStatus = $this->executeCommand('git status 2>&1', $gitStatusLog);
+                $log[] = "git status: код = {$gitStatus['code']}";
                 if ($gitStatus['code'] === 0) {
                     $isGitRepo = true;
-                    $log[] = "Git репозиторий найден через git status";
+                    $log[] = "✓ Git репозиторий найден через git status";
                 }
             }
             
@@ -91,13 +100,13 @@ class DeployController extends Controller
                     if ($gitPull['code'] !== 0) {
                         $log[] = "Предупреждение: Не удалось обновить код из git (возможно, нет изменений или проблемы с подключением)";
                     } else {
-                        $log[] = "Код успешно обновлен из ветки main";
+                        $log[] = "✓ Код успешно обновлен из ветки main";
                     }
                 } else {
-                    $log[] = "Код успешно обновлен из ветки master";
+                    $log[] = "✓ Код успешно обновлен из ветки master";
                 }
             } else {
-                $log[] = "Предупреждение: Директория не является git репозиторием";
+                $log[] = "⚠ Предупреждение: Директория не является git репозиторием";
                 $log[] = "Пропуск обновления из git";
             }
             $log[] = "";
@@ -411,13 +420,18 @@ class DeployController extends Controller
         
         // Сначала проверяем домашнюю директорию пользователя
         if ($homeDir) {
-            $composerPhar = $homeDir . '/composer.phar';
-            if (file_exists($composerPhar)) {
+            $composerPhar = rtrim($homeDir, '/') . '/composer.phar';
+            $composerPharExists = file_exists($composerPhar);
+            $dummy[] = "Проверка composer.phar: {$composerPhar}";
+            $dummy[] = "Файл существует: " . ($composerPharExists ? 'да' : 'нет');
+            if ($composerPharExists) {
                 $paths[] = 'php ' . $composerPhar;
-                $dummy[] = "Найден composer.phar в: {$composerPhar}";
+                $dummy[] = "✓ Найден composer.phar в: {$composerPhar}";
             } else {
-                $dummy[] = "composer.phar не найден в: {$composerPhar}";
+                $dummy[] = "✗ composer.phar не найден в: {$composerPhar}";
             }
+        } else {
+            $dummy[] = "HOME не установлен, пропуск проверки composer.phar в домашней директории";
         }
         
         // Проверяем глобальный composer
