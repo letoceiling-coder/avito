@@ -72,14 +72,24 @@ class OpenAIService
             }
 
             $errorData = $response->json();
+            $errorMessage = $errorData['error']['message'] ?? 'Ошибка генерации текста';
+            
+            // Специальная обработка для деактивированного аккаунта
+            if (isset($errorData['error']['code']) && $errorData['error']['code'] === 'account_deactivated') {
+                $errorMessage = 'OpenAI API ключ деактивирован. Пожалуйста, проверьте ваш API ключ в настройках OpenAI или создайте новый.';
+            }
+            
             Log::error('OpenAI: Error generating ad text', [
                 'status' => $response->status(),
                 'error' => $errorData,
+                'error_message' => $errorMessage,
             ]);
 
             return [
                 'success' => false,
-                'error' => $errorData['error']['message'] ?? 'Ошибка генерации текста',
+                'error' => $errorMessage,
+                'error_code' => $errorData['error']['code'] ?? null,
+                'details' => $errorData,
             ];
         } catch (Exception $e) {
             Log::error('OpenAI: Exception in generateAdText', [

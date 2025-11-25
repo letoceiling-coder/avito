@@ -145,29 +145,111 @@ class AvitoAdGeneratorController extends Controller
                 ];
 
                 // Генерируем текст объявления
-                $textResult = $this->openAIService->generateAdText($request->topic, $settings);
-
-                if (!$textResult['success']) {
-                    Log::error('Failed to generate ad text', [
-                        'error' => $textResult['error'],
+                Log::info('Calling OpenAI to generate ad text', [
+                    'iteration' => $i + 1,
+                    'topic' => $request->topic,
+                    'settings' => $settings,
+                ]);
+                
+                try {
+                    $textResult = $this->openAIService->generateAdText($request->topic, $settings);
+                } catch (Exception $e) {
+                    Log::error('Exception when calling OpenAI', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
                         'iteration' => $i + 1,
                     ]);
                     continue;
                 }
 
-                $adData = $textResult['data'];
+                Log::info('OpenAI text generation result', [
+                    'success' => $textResult['success'] ?? false,
+                    'has_data' => isset($textResult['data']),
+                    'error' => $textResult['error'] ?? null,
+                    'iteration' => $i + 1,
+                ]);
+
+                if (!$textResult['success']) {
+                    $errorMessage = $textResult['error'] ?? 'Unknown error';
+                    $errorCode = $textResult['error_code'] ?? null;
+                    
+                    Log::error('Failed to generate ad text', [
+                        'error' => $errorMessage,
+                        'error_code' => $errorCode,
+                        'iteration' => $i + 1,
+                    ]);
+                    
+                    // Если это ошибка деактивации аккаунта, прерываем все попытки
+                    if ($errorCode === 'account_deactivated') {
+                        Log::error('OpenAI account deactivated, stopping generation');
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Не удалось сгенерировать объявления',
+                            'error' => $errorMessage,
+                            'error_code' => $errorCode,
+                            'count' => 0,
+                            'ads' => [],
+                        ], 400);
+                    }
+                    
+                    continue;
+                }
+
+                $adData = $textResult['data'] ?? [];
                 $imagePrompts = $adData['image_prompts'] ?? [];
+                
+                Log::info('Parsed ad data from OpenAI', [
+                    'has_title' => !empty($adData['title']),
+                    'has_description' => !empty($adData['description']),
+                    'image_prompts_count' => count($imagePrompts),
+                    'iteration' => $i + 1,
+                ]);
 
                 // Генерируем изображения
                 $images = [];
-                foreach ($imagePrompts as $prompt) {
-                    $imageResult = $this->openAIService->generateImage($prompt);
-                    if ($imageResult['success']) {
-                        // Сохраняем изображение локально
-                        $savedUrl = $this->saveImageFromUrl($imageResult['url'], $request->user()->id);
-                        if ($savedUrl) {
-                            $images[] = $savedUrl;
+                Log::info('Starting image generation', [
+                    'image_prompts_count' => count($imagePrompts),
+                    'num_images' => $numImages,
+                    'iteration' => $i + 1,
+                ]);
+                
+                foreach ($imagePrompts as $promptIndex => $prompt) {
+                    Log::info('Generating image from prompt', [
+                        'prompt_index' => $promptIndex,
+                        'prompt' => substr($prompt, 0, 100),
+                        'iteration' => $i + 1,
+                    ]);
+                    
+                    try {
+                        $imageResult = $this->openAIService->generateImage($prompt);
+                        Log::info('Image generation result', [
+                            'success' => $imageResult['success'] ?? false,
+                            'has_url' => isset($imageResult['url']),
+                            'error' => $imageResult['error'] ?? null,
+                            'iteration' => $i + 1,
+                        ]);
+                        
+                        if ($imageResult['success']) {
+                            // Сохраняем изображение локально
+                            $savedUrl = $this->saveImageFromUrl($imageResult['url'], $request->user()->id);
+                            if ($savedUrl) {
+                                $images[] = $savedUrl;
+                                Log::info('Image saved successfully', [
+                                    'url' => $savedUrl,
+                                    'iteration' => $i + 1,
+                                ]);
+                            } else {
+                                Log::warning('Failed to save image', [
+                                    'original_url' => $imageResult['url'],
+                                    'iteration' => $i + 1,
+                                ]);
+                            }
                         }
+                    } catch (Exception $e) {
+                        Log::error('Exception when generating image', [
+                            'error' => $e->getMessage(),
+                            'iteration' => $i + 1,
+                        ]);
                     }
                     // Небольшая задержка между запросами к OpenAI
                     usleep(500000); // 0.5 секунды
@@ -175,18 +257,35 @@ class AvitoAdGeneratorController extends Controller
 
                 // Если не удалось сгенерировать изображения через промпты, генерируем по теме
                 if (empty($images) && $numImages > 0) {
+                    Log::info('No images from prompts, generating by topic', [
+                        'num_images' => $numImages,
+                        'iteration' => $i + 1,
+                    ]);
+                    
                     for ($j = 0; $j < $numImages; $j++) {
                         $imagePrompt = "Профессиональное фото для объявления на тему: {$request->topic}. Высокое качество, реалистичное изображение.";
-                        $imageResult = $this->openAIService->generateImage($imagePrompt);
-                        if ($imageResult['success']) {
-                            $savedUrl = $this->saveImageFromUrl($imageResult['url'], $request->user()->id);
-                            if ($savedUrl) {
-                                $images[] = $savedUrl;
+                        try {
+                            $imageResult = $this->openAIService->generateImage($imagePrompt);
+                            if ($imageResult['success']) {
+                                $savedUrl = $this->saveImageFromUrl($imageResult['url'], $request->user()->id);
+                                if ($savedUrl) {
+                                    $images[] = $savedUrl;
+                                }
                             }
+                        } catch (Exception $e) {
+                            Log::error('Exception when generating image by topic', [
+                                'error' => $e->getMessage(),
+                                'iteration' => $i + 1,
+                            ]);
                         }
                         usleep(500000);
                     }
                 }
+                
+                Log::info('Image generation completed', [
+                    'images_count' => count($images),
+                    'iteration' => $i + 1,
+                ]);
 
                 // Сохраняем объявление в БД
                 $ad = AvitoGeneratedAd::create([
@@ -217,6 +316,22 @@ class AvitoAdGeneratorController extends Controller
                 if ($i < $count - 1) {
                     sleep(1);
                 }
+            }
+
+            // Если не было сгенерировано ни одного объявления, возвращаем ошибку
+            if (empty($generatedAds)) {
+                Log::error('No ads were generated', [
+                    'requested_count' => $count,
+                    'topic' => $request->topic,
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Не удалось сгенерировать объявления',
+                    'error' => 'Все попытки генерации завершились ошибкой. Проверьте логи для деталей.',
+                    'count' => 0,
+                    'ads' => [],
+                ], 400);
             }
 
             return response()->json([

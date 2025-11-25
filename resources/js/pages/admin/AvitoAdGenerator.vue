@@ -413,11 +413,33 @@ export default {
                     // Очищаем форму
                     this.form.topic = '';
                 } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Ошибка',
-                        text: response.data.error || 'Не удалось сгенерировать объявления',
-                    });
+                    const errorMessage = response.data.error || 'Не удалось сгенерировать объявления';
+                    const errorCode = response.data.error_code;
+                    
+                    // Специальное сообщение для деактивированного OpenAI аккаунта
+                    if (errorCode === 'account_deactivated') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'OpenAI API ключ деактивирован',
+                            html: `
+                                <p>Ваш OpenAI API ключ был деактивирован.</p>
+                                <p style="margin-top: 10px;"><strong>Что нужно сделать:</strong></p>
+                                <ol style="text-align: left; margin-top: 10px;">
+                                    <li>Проверьте почту, связанную с вашим OpenAI аккаунтом</li>
+                                    <li>Проверьте баланс на вашем OpenAI аккаунте</li>
+                                    <li>Создайте новый API ключ в <a href="https://platform.openai.com/api-keys" target="_blank">настройках OpenAI</a></li>
+                                    <li>Обновите OPENAI_API_KEY в файле .env на сервере</li>
+                                </ol>
+                            `,
+                            confirmButtonText: 'Понятно',
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Ошибка',
+                            text: errorMessage,
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Error generating ads:', error);
