@@ -383,16 +383,32 @@ export default {
                 // Проверяем, не закрыл ли пользователь окно
                 const checkClosed = setInterval(() => {
                     if (authWindow.closed) {
-                        console.log('Auth window closed by user');
+                        console.log('⚠️ Auth window closed by user');
                         clearInterval(checkClosed);
                         window.removeEventListener('message', messageListener);
+                    } else {
+                        // Проверяем URL окна авторизации (если доступно)
+                        try {
+                            const windowUrl = authWindow.location.href;
+                            console.log('🔍 Auth window URL:', windowUrl);
+                            
+                            // Если видим callback URL, значит редирект произошел
+                            if (windowUrl.includes('/admin/avito/callback')) {
+                                console.log('✅ Callback URL detected in auth window!');
+                            }
+                        } catch (e) {
+                            // Не можем получить URL из-за CORS - это нормально
+                            // Но можем проверить, загрузилась ли callback страница
+                        }
                     }
                 }, 1000);
 
                 // Таймаут на случай, если окно не вернет ответ
                 setTimeout(() => {
                     if (!authWindow.closed) {
-                        console.warn('Auth timeout - window still open');
+                        console.warn('⚠️ Auth timeout - window still open after 5 minutes');
+                        console.warn('💡 Возможно, callback страница не загрузилась или не отправила сообщение');
+                        console.warn('💡 Проверьте, что callback URL правильный и страница доступна');
                     }
                 }, 300000); // 5 минут
             } catch (error) {

@@ -41,6 +41,9 @@ export default {
         };
     },
     mounted() {
+        console.log('🚀 AvitoCallback component mounted');
+        console.log('📍 Current URL:', window.location.href);
+        console.log('🔗 Has opener:', !!window.opener);
         this.processCallback();
     },
     methods: {
@@ -78,22 +81,30 @@ export default {
             }
 
             if (code) {
-                console.log('Authorization code received, processing...');
-                console.log('Current location:', {
+                console.log('✅ Authorization code received!');
+                console.log('📋 Code details:', {
+                    codeLength: code.length,
+                    codePreview: code.substring(0, 20) + '...',
                     origin: window.location.origin,
                     href: window.location.href,
                     hasOpener: !!window.opener,
-                    openerClosed: window.opener ? window.opener.closed : 'N/A'
+                    openerClosed: window.opener ? window.opener.closed : 'N/A',
+                    openerType: window.opener ? typeof window.opener : 'N/A'
                 });
                 
                 // Отправляем код в родительское окно
-                if (window.opener && !window.opener.closed) {
+                if (window.opener) {
+                    if (window.opener.closed) {
+                        console.warn('⚠️ Opener window is closed! Using localStorage fallback');
+                        localStorage.setItem('avito_auth_code', code);
+                        localStorage.setItem('avito_auth_redirect', window.location.href);
+                        window.location.href = '/admin/avito/integration';
+                        return;
+                    }
+                    
                     try {
                         // Отправляем сообщение с нашим origin, чтобы родительское окно могло его принять
                         const targetOrigin = window.location.origin;
-                        console.log('Sending message to opener with origin:', targetOrigin);
-                        console.log('Message data:', { type: 'avito-auth-success', code: code ? 'present' : 'missing' });
-                        
                         const message = {
                             type: 'avito-auth-success',
                             code: code,
@@ -103,25 +114,39 @@ export default {
                             targetOrigin: targetOrigin,
                             messageType: message.type,
                             hasCode: !!message.code,
-                            codeLength: message.code ? message.code.length : 0
+                            codeLength: message.code ? message.code.length : 0,
+                            openerClosed: window.opener.closed
                         });
                         
+                        // Отправляем сообщение немедленно
                         window.opener.postMessage(message, targetOrigin);
-                        
-                        console.log('✅ Message sent to opener successfully');
+                        console.log('✅ Message sent to opener (attempt 1)');
                         
                         // Отправляем сообщение несколько раз на случай, если первое не дошло
                         setTimeout(() => {
                             if (window.opener && !window.opener.closed) {
                                 console.log('📤 Resending message (retry 1)');
                                 window.opener.postMessage(message, targetOrigin);
+                            } else {
+                                console.warn('⚠️ Opener closed during retry 1');
                             }
-                        }, 500);
+                        }, 300);
                         
                         setTimeout(() => {
                             if (window.opener && !window.opener.closed) {
                                 console.log('📤 Resending message (retry 2)');
                                 window.opener.postMessage(message, targetOrigin);
+                            } else {
+                                console.warn('⚠️ Opener closed during retry 2');
+                            }
+                        }, 600);
+                        
+                        setTimeout(() => {
+                            if (window.opener && !window.opener.closed) {
+                                console.log('📤 Resending message (retry 3)');
+                                window.opener.postMessage(message, targetOrigin);
+                            } else {
+                                console.warn('⚠️ Opener closed during retry 3');
                             }
                         }, 1000);
                         
