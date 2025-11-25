@@ -124,7 +124,7 @@ class DeployController extends Controller
             $log[] = "HOME из getenv: " . ($homeFromGetenv ?: 'не установлен');
             $log[] = "Пользователь: " . get_current_user();
             
-            $composerPath = $this->findComposer();
+            $composerPath = $this->findComposer($log);
             $log[] = "Используется composer: {$composerPath}";
             
             // Выполняем команду composer (мы уже в корне проекта)
@@ -361,7 +361,7 @@ class DeployController extends Controller
     /**
      * Поиск пути к Composer
      */
-    private function findComposer()
+    private function findComposer(&$log = null)
     {
         // Сначала пробуем получить HOME из .env файла
         $homeDir = $this->getHomeFromEnv();
@@ -406,14 +406,16 @@ class DeployController extends Controller
         // Получаем пользователя, который запускает PHP
         $user = get_current_user();
         
-        // Логируем для отладки (будет видно в логах)
-        $dummy = [];
-        if ($homeDir) {
-            $dummy[] = "HOME найден: {$homeDir}";
-        } else {
-            $dummy[] = "HOME не найден";
+        // Логируем для отладки
+        if ($log !== null) {
+            $log[] = "Поиск composer...";
+            if ($homeDir) {
+                $log[] = "HOME найден: {$homeDir}";
+            } else {
+                $log[] = "HOME не найден";
+            }
+            $log[] = "Пользователь: {$user}";
         }
-        $dummy[] = "Пользователь: {$user}";
         
         // Проверяем различные возможные пути
         $paths = [];
@@ -422,16 +424,32 @@ class DeployController extends Controller
         if ($homeDir) {
             $composerPhar = rtrim($homeDir, '/') . '/composer.phar';
             $composerPharExists = file_exists($composerPhar);
-            $dummy[] = "Проверка composer.phar: {$composerPhar}";
-            $dummy[] = "Файл существует: " . ($composerPharExists ? 'да' : 'нет');
+            if ($log !== null) {
+                $log[] = "Проверка composer.phar: {$composerPhar}";
+                $log[] = "Файл существует: " . ($composerPharExists ? 'да' : 'нет');
+            }
             if ($composerPharExists) {
                 $paths[] = 'php ' . $composerPhar;
-                $dummy[] = "✓ Найден composer.phar в: {$composerPhar}";
+                if ($log !== null) {
+                    $log[] = "✓ Найден composer.phar в: {$composerPhar}";
+                }
             } else {
-                $dummy[] = "✗ composer.phar не найден в: {$composerPhar}";
+                if ($log !== null) {
+                    $log[] = "✗ composer.phar не найден в: {$composerPhar}";
+                    // Попробуем найти composer.phar в других местах
+                    $log[] = "Поиск composer.phar в других местах...";
+                    $findResult = $this->executeCommand("find {$homeDir} -name composer.phar -type f 2>/dev/null | head -1", $findLog);
+                    if (!empty($findResult['output']) && file_exists(trim($findResult['output'][0]))) {
+                        $foundPath = trim($findResult['output'][0]);
+                        $log[] = "✓ Найден composer.phar в: {$foundPath}";
+                        $paths[] = 'php ' . $foundPath;
+                    }
+                }
             }
         } else {
-            $dummy[] = "HOME не установлен, пропуск проверки composer.phar в домашней директории";
+            if ($log !== null) {
+                $log[] = "HOME не установлен, пропуск проверки composer.phar в домашней директории";
+            }
         }
         
         // Проверяем глобальный composer
