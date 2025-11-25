@@ -346,15 +346,36 @@ class AvitoApiService
             ]);
 
             $client = $this->getAuthorizedClient($integration);
-            // Используем /core/v1/items без userId в пути, так как userId определяется из токена
-            $url = self::BASE_URL . "/core/v1/items";
+            
+            // Пробуем оба варианта endpoint:
+            // 1. С userId в пути (как в документации для некоторых методов)
+            // 2. Без userId (как для получения списка)
+            // Начинаем с варианта с userId, так как это стандартный формат для создания
+            $url = self::BASE_URL . "/core/v1/accounts/{$userId}/items";
             
             Log::info('Avito API: Sending POST request', [
                 'url' => $url,
-                'ad_data' => $adData,
+                'user_id' => $userId,
+                'ad_data_keys' => array_keys($adData),
+                'ad_data_sample' => [
+                    'title' => $adData['title'] ?? null,
+                    'category_id' => $adData['category_id'] ?? null,
+                    'has_location' => isset($adData['location']),
+                    'has_price' => isset($adData['price']),
+                    'has_contact' => isset($adData['contact']),
+                    'images_count' => isset($adData['images']) ? count($adData['images']) : 0,
+                ],
             ]);
 
             $response = $client->post($url, $adData);
+            
+            // Если получили 404, пробуем альтернативный endpoint
+            if ($response->status() === 404) {
+                Log::warning('Avito API: Got 404 with userId in path, trying alternative endpoint');
+                $alternativeUrl = self::BASE_URL . "/core/v1/items";
+                Log::info('Avito API: Trying alternative endpoint', ['url' => $alternativeUrl]);
+                $response = $client->post($alternativeUrl, $adData);
+            }
 
             Log::info('Avito API: Create ad response', [
                 'status' => $response->status(),
