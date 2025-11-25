@@ -381,24 +381,45 @@ export default {
                 window.addEventListener('message', messageListener);
 
                 // Проверяем, не закрыл ли пользователь окно
+                let checkCount = 0;
                 const checkClosed = setInterval(() => {
+                    checkCount++;
                     if (authWindow.closed) {
-                        console.log('⚠️ Auth window closed by user');
+                        console.log('⚠️ Auth window closed by user (check #' + checkCount + ')');
                         clearInterval(checkClosed);
                         window.removeEventListener('message', messageListener);
+                        
+                        // Проверяем, есть ли код в localStorage (fallback)
+                        const savedCode = localStorage.getItem('avito_auth_code');
+                        if (savedCode) {
+                            console.log('✅ Found code in localStorage, using fallback');
+                            localStorage.removeItem('avito_auth_code');
+                            localStorage.removeItem('avito_auth_redirect');
+                            // Сохраняем токены асинхронно
+                            this.saveTokens(savedCode).catch(err => {
+                                console.error('Error saving tokens from localStorage:', err);
+                            });
+                        } else {
+                            console.warn('⚠️ No code found in localStorage. Callback page may not have loaded.');
+                        }
                     } else {
                         // Проверяем URL окна авторизации (если доступно)
                         try {
                             const windowUrl = authWindow.location.href;
-                            console.log('🔍 Auth window URL:', windowUrl);
+                            if (checkCount % 5 === 0) { // Логируем каждые 5 секунд
+                                console.log('🔍 Auth window URL (check #' + checkCount + '):', windowUrl);
+                            }
                             
                             // Если видим callback URL, значит редирект произошел
                             if (windowUrl.includes('/admin/avito/callback')) {
                                 console.log('✅ Callback URL detected in auth window!');
+                                console.log('⏳ Waiting for callback page to send message...');
                             }
                         } catch (e) {
                             // Не можем получить URL из-за CORS - это нормально
-                            // Но можем проверить, загрузилась ли callback страница
+                            if (checkCount % 10 === 0) {
+                                console.log('🔍 Cannot access auth window URL (CORS) - check #' + checkCount);
+                            }
                         }
                     }
                 }, 1000);
@@ -467,6 +488,7 @@ export default {
             // Проверяем, есть ли код авторизации в localStorage (для случая прямого редиректа)
             const code = localStorage.getItem('avito_auth_code');
             if (code) {
+                console.log('✅ Found saved auth code in localStorage');
                 localStorage.removeItem('avito_auth_code');
                 localStorage.removeItem('avito_auth_redirect');
                 
