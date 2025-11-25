@@ -375,6 +375,20 @@ class Deploy extends Command
                 $this->newLine();
                 $this->info('🔨 Сборка фронтенда...');
                 
+                // Устанавливаем права на выполнение для node_modules/.bin (исправление проблемы с vite)
+                $nodeModulesBin = base_path('node_modules/.bin');
+                if (is_dir($nodeModulesBin)) {
+                    try {
+                        $chmodProcess = new SymfonyProcess(['chmod', '-R', '+x', $nodeModulesBin]);
+                        $chmodProcess->run();
+                        if ($chmodProcess->isSuccessful()) {
+                            $this->line('   ✓ Права на выполнение установлены для node_modules/.bin');
+                        }
+                    } catch (\Exception $e) {
+                        // Игнорируем ошибки chmod, продолжаем сборку
+                    }
+                }
+                
                 $nvmCommand = $this->getNvmCommand();
                 
                 $buildOutput = '';
