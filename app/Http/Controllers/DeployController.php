@@ -137,7 +137,26 @@ class DeployController extends Controller
 
             // Шаг 9: Установка прав доступа
             $log[] = "Шаг 9: Установка прав доступа...";
-            $this->executeCommand('chmod -R 755 storage bootstrap/cache 2>&1', $log);
+            
+            // Используем абсолютные пути
+            $basePath = base_path();
+            $storagePath = $basePath . '/storage';
+            $cachePath = $basePath . '/bootstrap/cache';
+            
+            if (is_dir($storagePath)) {
+                $this->executeCommand("chmod -R 755 {$storagePath} 2>&1", $log);
+                $log[] = "Права для storage установлены";
+            } else {
+                $log[] = "Предупреждение: директория storage не найдена";
+            }
+            
+            if (is_dir($cachePath)) {
+                $this->executeCommand("chmod -R 755 {$cachePath} 2>&1", $log);
+                $log[] = "Права для bootstrap/cache установлены";
+            } else {
+                $log[] = "Предупреждение: директория bootstrap/cache не найдена";
+            }
+            
             $log[] = "";
 
             $log[] = "=== Развертывание завершено успешно! ===";
@@ -204,21 +223,52 @@ class DeployController extends Controller
      */
     private function findComposer()
     {
+        // Получаем домашнюю директорию пользователя
+        $homeDir = getenv('HOME') ?: (getenv('HOMEDRIVE') . getenv('HOMEPATH'));
+        $user = get_current_user();
+        
+        // Проверяем различные возможные пути
         $paths = [
-            'composer',
-            'php ~/composer.phar',
-            'php composer.phar',
-            '/usr/local/bin/composer',
-            '/usr/bin/composer'
+            'composer', // Глобальный composer
         ];
-
+        
+        // Добавляем пути с домашней директорией
+        if ($homeDir) {
+            $paths[] = 'php ' . $homeDir . '/composer.phar';
+        }
+        
+        // Добавляем стандартные пути
+        $paths = array_merge($paths, [
+            'php ~/composer.phar', // В домашней директории (через ~)
+            'php composer.phar', // В текущей директории
+            '/usr/local/bin/composer',
+            '/usr/bin/composer',
+            '/opt/cpanel/composer/bin/composer', // Для cPanel
+        ]);
+        
+        // Проверяем каждый путь
         foreach ($paths as $path) {
-            if ($this->commandExists($path)) {
-                return $path;
+            // Для путей с пробелами проверяем только первую часть
+            $commandParts = explode(' ', $path);
+            $checkCommand = $commandParts[0];
+            
+            if ($this->commandExists($checkCommand)) {
+                // Если это путь с файлом, проверяем существование файла
+                if (count($commandParts) > 1 && strpos($path, 'composer.phar') !== false) {
+                    $filePath = str_replace(['php ', '~/'], [$homeDir . '/', $homeDir . '/'], $path);
+                    $filePath = preg_replace('/^php\s+/', '', $filePath);
+                    $filePath = str_replace('~/', $homeDir . '/', $filePath);
+                    
+                    if (file_exists($filePath) || file_exists(str_replace($homeDir . '/', '', $filePath))) {
+                        return $path;
+                    }
+                } else {
+                    return $path;
+                }
             }
         }
 
-        return 'composer'; // По умолчанию
+        return 'composer'; // По умолчанию (может не работать, но попробуем)
     }
 
     /**
