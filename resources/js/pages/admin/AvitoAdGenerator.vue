@@ -194,9 +194,10 @@
                         <img
                             v-for="(img, idx) in ad.images.slice(0, 3)"
                             :key="idx"
-                            :src="img"
+                            :src="getImageUrl(img)"
                             :alt="ad.title"
                             class="w-16 h-16 object-cover rounded border border-border"
+                            @error="handleImageError"
                         />
                     </div>
                 </div>
@@ -227,9 +228,10 @@
                             <img
                                 v-for="(img, idx) in selectedAd.images"
                                 :key="idx"
-                                :src="img"
+                                :src="getImageUrl(img)"
                                 :alt="selectedAd.title"
                                 class="w-full h-48 object-cover rounded-lg border border-border"
+                                @error="handleImageError"
                             />
                         </div>
                     </div>
@@ -377,7 +379,9 @@ export default {
             try {
                 const response = await axios.get('/api/avito/generator/ads');
                 if (response.data.success) {
-                    this.generatedAds = response.data.data.data || [];
+                    // Структура ответа: { success: true, data: { items: [...], pagination: {...} } }
+                    const data = response.data.data || {};
+                    this.generatedAds = data.items || data.data || data || [];
                 }
             } catch (error) {
                 console.error('Error loading generated ads:', error);
@@ -497,6 +501,26 @@ export default {
                 failed: 'Ошибка',
             };
             return statusMap[status] || status;
+        },
+        getImageUrl(img) {
+            // Если URL уже полный (начинается с http), возвращаем как есть
+            if (img && img.startsWith('http')) {
+                return img;
+            }
+            // Если путь относительный (начинается с /storage), добавляем базовый URL
+            if (img && img.startsWith('/storage')) {
+                return window.location.origin + img;
+            }
+            // Если путь без слеша, добавляем /storage/
+            if (img && !img.startsWith('/')) {
+                return window.location.origin + '/storage/' + img;
+            }
+            return img || '';
+        },
+        handleImageError(event) {
+            // Заменяем изображение на placeholder при ошибке загрузки
+            event.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23ddd" width="200" height="200"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EИзображение%3C/text%3E%3C/svg%3E';
+            console.warn('Failed to load image:', event.target.src);
         },
     },
 };

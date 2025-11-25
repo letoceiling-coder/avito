@@ -35,7 +35,17 @@ class AvitoAdGeneratorController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $ads,
+            'data' => [
+                'items' => $ads->items(),
+                'pagination' => [
+                    'total' => $ads->total(),
+                    'per_page' => $ads->perPage(),
+                    'current_page' => $ads->currentPage(),
+                    'last_page' => $ads->lastPage(),
+                    'from' => $ads->firstItem(),
+                    'to' => $ads->lastItem(),
+                ],
+            ],
         ]);
     }
 

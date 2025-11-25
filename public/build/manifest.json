@@ -17,7 +17,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-rg9CDWJP.js",
+    "file": "assets/app-CkUNTlHT.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -46,7 +46,7 @@
     ]
   },
   "resources/js/layouts/AdminLayout.vue": {
-    "file": "assets/AdminLayout-r9EVnuUy.js",
+    "file": "assets/AdminLayout-BZ48Up2R.js",
     "name": "AdminLayout",
     "src": "resources/js/layouts/AdminLayout.vue",
     "isDynamicEntry": true,
@@ -55,7 +55,7 @@
     ]
   },
   "resources/js/pages/admin/AvitoAdGenerator.vue": {
-    "file": "assets/AvitoAdGenerator-BOCQE4vY.js",
+    "file": "assets/AvitoAdGenerator-0Ai757s9.js",
     "name": "AvitoAdGenerator",
     "src": "resources/js/pages/admin/AvitoAdGenerator.vue",
     "isDynamicEntry": true,
@@ -65,7 +65,7 @@
     ]
   },
   "resources/js/pages/admin/AvitoAds.vue": {
-    "file": "assets/AvitoAds-BMVaVW_w.js",
+    "file": "assets/AvitoAds-BPtZPGWm.js",
     "name": "AvitoAds",
     "src": "resources/js/pages/admin/AvitoAds.vue",
     "isDynamicEntry": true,
@@ -74,7 +74,7 @@
     ]
   },
   "resources/js/pages/admin/AvitoCallback.vue": {
-    "file": "assets/AvitoCallback-BxZgQ12v.js",
+    "file": "assets/AvitoCallback-wDjhF4gW.js",
     "name": "AvitoCallback",
     "src": "resources/js/pages/admin/AvitoCallback.vue",
     "isDynamicEntry": true,
@@ -83,7 +83,7 @@
     ]
   },
   "resources/js/pages/admin/AvitoIntegration.vue": {
-    "file": "assets/AvitoIntegration-CbiNlNpu.js",
+    "file": "assets/AvitoIntegration-BNedRQmT.js",
     "name": "AvitoIntegration",
     "src": "resources/js/pages/admin/AvitoIntegration.vue",
     "isDynamicEntry": true,
@@ -93,7 +93,7 @@
     ]
   },
   "resources/js/pages/admin/AvitoMassPosting.vue": {
-    "file": "assets/AvitoMassPosting-BCCTFijJ.js",
+    "file": "assets/AvitoMassPosting-Bx0-UQC_.js",
     "name": "AvitoMassPosting",
     "src": "resources/js/pages/admin/AvitoMassPosting.vue",
     "isDynamicEntry": true,
@@ -103,7 +103,7 @@
     ]
   },
   "resources/js/pages/admin/Categories.vue": {
-    "file": "assets/Categories-BO-udn_9.js",
+    "file": "assets/Categories-BQiKdgl1.js",
     "name": "Categories",
     "src": "resources/js/pages/admin/Categories.vue",
     "isDynamicEntry": true,
@@ -112,7 +112,7 @@
     ]
   },
   "resources/js/pages/admin/Dashboard.vue": {
-    "file": "assets/Dashboard-BCNoi_o6.js",
+    "file": "assets/Dashboard-BYyKZiQ7.js",
     "name": "Dashboard",
     "src": "resources/js/pages/admin/Dashboard.vue",
     "isDynamicEntry": true,
@@ -121,7 +121,7 @@
     ]
   },
   "resources/js/pages/admin/Media.vue": {
-    "file": "assets/Media-BqUuTAqB.js",
+    "file": "assets/Media-o9G4iSnT.js",
     "name": "Media",
     "src": "resources/js/pages/admin/Media.vue",
     "isDynamicEntry": true,
@@ -135,7 +135,7 @@
     ]
   },
   "resources/js/pages/admin/Notifications.vue": {
-    "file": "assets/Notifications-B9c1jP06.js",
+    "file": "assets/Notifications-DU0bliqh.js",
     "name": "Notifications",
     "src": "resources/js/pages/admin/Notifications.vue",
     "isDynamicEntry": true,
@@ -145,7 +145,7 @@
     ]
   },
   "resources/js/pages/admin/Products.vue": {
-    "file": "assets/Products-BUD3ECL8.js",
+    "file": "assets/Products-CYRQiQ0-.js",
     "name": "Products",
     "src": "resources/js/pages/admin/Products.vue",
     "isDynamicEntry": true,
@@ -154,7 +154,7 @@
     ]
   },
   "resources/js/pages/admin/Roles.vue": {
-    "file": "assets/Roles-B-YmkiTO.js",
+    "file": "assets/Roles-gULggouw.js",
     "name": "Roles",
     "src": "resources/js/pages/admin/Roles.vue",
     "isDynamicEntry": true,
@@ -165,7 +165,7 @@
     ]
   },
   "resources/js/pages/admin/Services.vue": {
-    "file": "assets/Services-DMxYgBf1.js",
+    "file": "assets/Services-DWACmCZG.js",
     "name": "Services",
     "src": "resources/js/pages/admin/Services.vue",
     "isDynamicEntry": true,
@@ -174,7 +174,7 @@
     ]
   },
   "resources/js/pages/admin/Settings.vue": {
-    "file": "assets/Settings-CfMX0s_2.js",
+    "file": "assets/Settings-C3twIBZf.js",
     "name": "Settings",
     "src": "resources/js/pages/admin/Settings.vue",
     "isDynamicEntry": true,
@@ -183,7 +183,7 @@
     ]
   },
   "resources/js/pages/admin/Subscription.vue": {
-    "file": "assets/Subscription-gL9sl-5W.js",
+    "file": "assets/Subscription-wbpKmLHL.js",
     "name": "Subscription",
     "src": "resources/js/pages/admin/Subscription.vue",
     "isDynamicEntry": true,
@@ -192,7 +192,7 @@
     ]
   },
   "resources/js/pages/admin/Users.vue": {
-    "file": "assets/Users-F4gtO_eZ.js",
+    "file": "assets/Users-CNvo7HxZ.js",
     "name": "Users",
     "src": "resources/js/pages/admin/Users.vue",
     "isDynamicEntry": true,
@@ -203,7 +203,7 @@
     ]
   },
   "resources/js/pages/admin/Versions.vue": {
-    "file": "assets/Versions-C4YPlQVp.js",
+    "file": "assets/Versions-DyZ_Ubql.js",
     "name": "Versions",
     "src": "resources/js/pages/admin/Versions.vue",
     "isDynamicEntry": true,
@@ -212,7 +212,7 @@
     ]
   },
   "resources/js/pages/auth/ForgotPassword.vue": {
-    "file": "assets/ForgotPassword-DHNWVdkH.js",
+    "file": "assets/ForgotPassword-BwiDDraZ.js",
     "name": "ForgotPassword",
     "src": "resources/js/pages/auth/ForgotPassword.vue",
     "isDynamicEntry": true,
@@ -221,7 +221,7 @@
     ]
   },
   "resources/js/pages/auth/Login.vue": {
-    "file": "assets/Login-DmqF5X1Q.js",
+    "file": "assets/Login-BigiJA5V.js",
     "name": "Login",
     "src": "resources/js/pages/auth/Login.vue",
     "isDynamicEntry": true,
@@ -230,7 +230,7 @@
     ]
   },
   "resources/js/pages/auth/Register.vue": {
-    "file": "assets/Register-rdtk7Kdm.js",
+    "file": "assets/Register-DsGTxQhh.js",
     "name": "Register",
     "src": "resources/js/pages/auth/Register.vue",
     "isDynamicEntry": true,
@@ -239,7 +239,7 @@
     ]
   },
   "resources/js/pages/auth/ResetPassword.vue": {
-    "file": "assets/ResetPassword-Ihi1w5kq.js",
+    "file": "assets/ResetPassword-wMfyuKiB.js",
     "name": "ResetPassword",
     "src": "resources/js/pages/auth/ResetPassword.vue",
     "isDynamicEntry": true,
