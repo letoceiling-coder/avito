@@ -311,7 +311,8 @@ class AvitoApiService
     /**
      * Создать объявление
      * Согласно документации Авито API: https://developers.avito.ru/api-catalog
-     * Endpoint: POST /core/v1/accounts/{userId}/items
+     * Endpoint: POST /core/v1/items
+     * userId определяется автоматически из токена авторизации
      * 
      * Структура данных для сферы услуг:
      * {
@@ -345,7 +346,8 @@ class AvitoApiService
             ]);
 
             $client = $this->getAuthorizedClient($integration);
-            $url = self::BASE_URL . "/core/v1/accounts/{$userId}/items";
+            // Используем /core/v1/items без userId в пути, так как userId определяется из токена
+            $url = self::BASE_URL . "/core/v1/items";
             
             Log::info('Avito API: Sending POST request', [
                 'url' => $url,
