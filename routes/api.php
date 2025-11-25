@@ -21,6 +21,7 @@ Route::prefix('auth')->group(function () {
 });
 
 // Роут для обновления проекта (защищен секретным ключом)
+// Доступен по /api/deploy (автоматический префикс /api для routes/api.php)
 Route::post('/deploy', [DeployController::class, 'deploy'])->middleware('throttle:10,1');
 Route::get('/deploy/status', [DeployController::class, 'status']);
 
