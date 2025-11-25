@@ -36,14 +36,32 @@ class AvitoAdsController extends Controller
         // Получаем userId
         $testResult = $this->avitoApiService->testConnection($integration);
         if (!$testResult['success']) {
-            return response()->json($testResult, 400);
-        }
-        $userId = $testResult['data']['id'] ?? null;
-
-        if (!$userId) {
+            \Log::error('Avito API: Failed to get user ID in index', [
+                'error' => $testResult['error'] ?? 'Unknown error',
+                'data' => $testResult['data'] ?? null,
+                'details' => $testResult['details'] ?? null,
+            ]);
             return response()->json([
                 'success' => false,
-                'error' => 'Не удалось определить ID пользователя',
+                'error' => $testResult['error'] ?? 'Ошибка подключения к API Авито',
+                'details' => $testResult,
+            ], 400);
+        }
+        
+        // Проверяем структуру ответа - userId может быть в разных полях
+        $userId = $testResult['data']['id'] 
+               ?? $testResult['data']['user_id'] 
+               ?? $testResult['data']['account_id']
+               ?? null;
+        
+        if (!$userId) {
+            \Log::error('Avito API: User ID not found in response', [
+                'test_result' => $testResult,
+            ]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Не удалось определить ID пользователя из ответа API',
+                'details' => $testResult,
             ], 400);
         }
 
