@@ -227,11 +227,23 @@ export default {
                 // Показываем информацию о redirect_uri для проверки
                 const redirectUriInfo = `
                     <div style="text-align: left; margin: 10px 0;">
-                        <p><strong>Проверьте настройки приложения Авито:</strong></p>
-                        <p style="margin: 5px 0;">Redirect URI должен быть точно таким:</p>
-                        <code style="background: #f0f0f0; padding: 8px; border-radius: 4px; display: block; word-break: break-all; margin: 5px 0;">${response.data.redirect_uri}</code>
-                        <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                            Если видите ошибку "Что-то пошло не так", скорее всего Redirect URI в настройках Авито не совпадает с указанным выше.
+                        <p><strong>⚠️ ВАЖНО: Проверьте настройки приложения Авито перед авторизацией!</strong></p>
+                        <p style="margin: 10px 0;">Redirect URI должен быть <strong>ТОЧНО</strong> таким (скопируйте полностью):</p>
+                        <div style="background: #f0f0f0; padding: 12px; border-radius: 4px; margin: 10px 0; border: 2px solid #ff6b6b;">
+                            <code style="font-size: 0.9em; word-break: break-all; color: #d63384;">${response.data.redirect_uri}</code>
+                        </div>
+                        <p style="margin-top: 15px; font-size: 0.9em; color: #d63384;">
+                            <strong>Если видите ошибку "Что-то пошло не так" в окне авторизации:</strong>
+                        </p>
+                        <ol style="margin: 10px 0; padding-left: 20px; font-size: 0.9em; color: #666;">
+                            <li>Перейдите в <a href="https://developers.avito.ru/applications" target="_blank" style="color: #0066cc; text-decoration: underline;">настройки приложения Авито</a></li>
+                            <li>Найдите ваше приложение (Client ID: <code>${response.data.client_id}</code>)</li>
+                            <li>Проверьте поле "Redirect URI" - оно должно совпадать <strong>ТОЧНО</strong> с указанным выше</li>
+                            <li>Убедитесь, что нет лишних пробелов, слешей в конце, или других символов</li>
+                            <li>Сохраните изменения и попробуйте снова</li>
+                        </ol>
+                        <p style="margin-top: 15px; font-size: 0.85em; color: #999; font-style: italic;">
+                            После нажатия "Продолжить" откроется окно авторизации. Если увидите ошибку, вернитесь и проверьте настройки.
                         </p>
                     </div>
                 `;
@@ -240,9 +252,11 @@ export default {
                     icon: 'info',
                     title: 'Перед авторизацией',
                     html: redirectUriInfo,
-                    confirmButtonText: 'Продолжить',
+                    confirmButtonText: 'Продолжить авторизацию',
                     showCancelButton: true,
                     cancelButtonText: 'Отмена',
+                    width: '700px',
+                    confirmButtonColor: '#0066cc',
                 });
                 
                 if (!confirm.isConfirmed) {
@@ -424,10 +438,55 @@ export default {
                                 console.log('✅ Callback URL detected in auth window!');
                                 console.log('⏳ Waiting for callback page to send message...');
                             }
+                            
+                            // Проверяем, не показывает ли Авито ошибку
+                            // Если URL содержит avito.ru/oauth и прошло больше 10 секунд без редиректа - возможно ошибка
+                            if (windowUrl.includes('avito.ru/oauth') && checkCount > 10) {
+                                console.warn('⚠️ Avito OAuth page still open after 10 seconds');
+                                console.warn('💡 Возможно, Авито показывает ошибку. Проверьте окно авторизации.');
+                                console.warn('💡 Убедитесь, что Redirect URI в настройках приложения Авито точно совпадает:');
+                                console.warn('   ' + response.data.redirect_uri);
+                            }
                         } catch (e) {
                             // Не можем получить URL из-за CORS - это нормально
                             if (checkCount % 10 === 0) {
                                 console.log('🔍 Cannot access auth window URL (CORS) - check #' + checkCount);
+                            }
+                            
+                            // Если прошло много времени и окно не закрылось, возможно там ошибка
+                            if (checkCount > 30) { // 30 секунд
+                                console.warn('⚠️ Auth window open for 30+ seconds without callback');
+                                console.warn('💡 Возможно, Авито показывает ошибку "Что-то пошло не так"');
+                                console.warn('💡 Это обычно означает, что Redirect URI в настройках приложения Авито не совпадает');
+                                console.warn('💡 Проверьте настройки приложения: https://developers.avito.ru/applications');
+                                console.warn('💡 Redirect URI должен быть точно: ' + response.data.redirect_uri);
+                                
+                                // Показываем предупреждение пользователю
+                                if (checkCount === 30) { // Только один раз
+                                    Swal.fire({
+                                        icon: 'warning',
+                                        title: 'Возможна ошибка авторизации',
+                                        html: `
+                                            <p>Окно авторизации открыто более 30 секунд без редиректа.</p>
+                                            <p class="mt-3"><strong>Возможные причины:</strong></p>
+                                            <ol class="text-left mt-2 space-y-1">
+                                                <li>1. Авито показывает ошибку "Что-то пошло не так"</li>
+                                                <li>2. Redirect URI в настройках приложения не совпадает</li>
+                                                <li>3. Приложение не подтверждено в Авито</li>
+                                            </ol>
+                                            <p class="mt-3"><strong>Что проверить:</strong></p>
+                                            <p class="text-left mt-2">
+                                                Перейдите в <a href="https://developers.avito.ru/applications" target="_blank" class="underline">настройки приложения Авито</a> и убедитесь, что Redirect URI точно такой:
+                                            </p>
+                                            <code class="block mt-2 p-2 bg-gray-100 rounded text-xs break-all">${response.data.redirect_uri}</code>
+                                            <p class="mt-3 text-sm text-gray-600">
+                                                Проверьте окно авторизации - возможно, там есть сообщение об ошибке.
+                                            </p>
+                                        `,
+                                        confirmButtonText: 'Понятно',
+                                        width: '600px',
+                                    });
+                                }
                             }
                         }
                     }
