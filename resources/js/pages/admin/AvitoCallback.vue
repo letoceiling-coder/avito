@@ -76,15 +76,28 @@ export default {
             }
 
             if (code) {
+                console.log('Authorization code received, processing...');
+                console.log('Current location:', {
+                    origin: window.location.origin,
+                    href: window.location.href,
+                    hasOpener: !!window.opener,
+                    openerClosed: window.opener ? window.opener.closed : 'N/A'
+                });
+                
                 // Отправляем код в родительское окно
                 if (window.opener && !window.opener.closed) {
                     try {
+                        // Отправляем сообщение с нашим origin, чтобы родительское окно могло его принять
+                        const targetOrigin = window.location.origin;
+                        console.log('Sending message to opener with origin:', targetOrigin);
+                        console.log('Message data:', { type: 'avito-auth-success', code: code ? 'present' : 'missing' });
+                        
                         window.opener.postMessage({
                             type: 'avito-auth-success',
                             code: code,
-                        }, window.location.origin);
+                        }, targetOrigin);
                         
-                        console.log('Message sent to opener');
+                        console.log('✓ Message sent to opener successfully');
                         
                         // Показываем успех перед закрытием
                         this.processing = false;
@@ -98,6 +111,7 @@ export default {
                         this.processing = false;
                     }
                 } else {
+                    console.log('No opener found, using localStorage fallback');
                     // Если нет opener, возможно это прямой редирект
                     // Сохраняем код в localStorage и редиректим обратно
                     localStorage.setItem('avito_auth_code', code);
