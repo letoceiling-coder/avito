@@ -348,6 +348,14 @@ class AvitoAdsController extends Controller
 
             $result = $this->avitoApiService->createAd($integration, $userId, $adData);
             
+            // Если получили 404, добавляем рекомендацию о переавторизации
+            if (!$result['success'] && isset($result['details']['message']) && 
+                str_contains($result['details']['message'], 'no Route matched')) {
+                $result['error'] = 'Endpoint не найден. Необходимо переавторизоваться с scope items:write. ' .
+                    'Перейдите на страницу /admin/avito/integration и нажмите "Переавторизоваться через OAuth". ' .
+                    'Текущая ошибка: ' . ($result['error'] ?? 'Unknown error');
+            }
+            
             // Если объявление успешно создано и нужно применить VAS
             if ($result['success'] && isset($result['data']['id'])) {
                 $itemId = $result['data']['id'];
