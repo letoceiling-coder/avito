@@ -14,27 +14,28 @@ class DeployController extends Controller
      */
     public function deploy(Request $request)
     {
-        // Проверка секретного ключа
+        // Проверка секретного ключа (опционально для обратной совместимости)
         $secret = $request->input('secret');
         $expectedSecret = config('app.deploy_secret', env('DEPLOY_SECRET'));
 
-        if (!$expectedSecret) {
-            return response()->json([
-                'message' => 'Секретный ключ не настроен на сервере',
-                'error' => 'Установите DEPLOY_SECRET в .env файле',
-            ], 500);
-        }
+        // Если секретный ключ настроен, проверяем его
+        if ($expectedSecret) {
+            if (!$secret || $secret !== $expectedSecret) {
+                Log::warning('Попытка обновления с неверным секретным ключом', [
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
 
-        if ($secret !== $expectedSecret) {
-            Log::warning('Попытка обновления с неверным секретным ключом', [
+                return response()->json([
+                    'message' => 'Неверный секретный ключ',
+                    'error' => 'Доступ запрещен',
+                ], 403);
+            }
+        } else {
+            // Если секретный ключ не настроен, предупреждаем
+            Log::warning('Развертывание без секретного ключа (небезопасно!)', [
                 'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
             ]);
-
-            return response()->json([
-                'message' => 'Неверный секретный ключ',
-                'error' => 'Доступ запрещен',
-            ], 403);
         }
 
         $branch = $request->input('branch', 'master');

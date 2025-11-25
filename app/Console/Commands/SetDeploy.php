@@ -372,7 +372,51 @@ class SetDeploy extends Command
                     ]);
                 }
                 
-                $response = $httpClient->post("{$serverUrl}/api/deploy", $payload);
+                // Пробуем сначала новый роут, потом старый для обратной совместимости
+                // На сервере может быть еще старый код, поэтому пробуем оба
+                $endpoints = [
+                    "{$serverUrl}/api/deploy",
+                    "{$serverUrl}/deploy"
+                ];
+                
+                $response = null;
+                $usedEndpoint = null;
+                $lastError = null;
+                
+                foreach ($endpoints as $endpoint) {
+                    try {
+                        $this->line("   Попытка: {$endpoint}");
+                        $testResponse = $httpClient->post($endpoint, $payload);
+                        
+                        // Если успешно (200-299) или ошибка авторизации/валидации (403, 422), значит endpoint работает
+                        // Если 404 - endpoint не найден, пробуем следующий
+                        // Если 405 - метод не разрешен, но endpoint существует (может быть старая версия)
+                        if ($testResponse->status() === 404) {
+                            $this->warn("   Endpoint не найден (404), пробуем следующий...");
+                            continue;
+                        }
+                        
+                        // Если не 404, значит endpoint существует
+                        $response = $testResponse;
+                        $usedEndpoint = $endpoint;
+                        break;
+                    } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                        $lastError = $e;
+                        $this->warn("   Ошибка подключения: " . $e->getMessage());
+                        continue;
+                    } catch (\Exception $e) {
+                        $lastError = $e;
+                        continue;
+                    }
+                }
+                
+                if (!$response) {
+                    throw new \Exception('Не удалось подключиться ни к одному endpoint. Убедитесь, что на сервере обновлен код.');
+                }
+                
+                if ($usedEndpoint) {
+                    $this->info("   ✓ Используется endpoint: {$usedEndpoint}");
+                }
 
                 if ($response->successful()) {
                     $data = $response->json();
