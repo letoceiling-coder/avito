@@ -95,8 +95,24 @@ class AvitoApiService
     {
         // Проверяем и обновляем токен при необходимости
         if (!$integration->isTokenValid() && $integration->refresh_token) {
+            Log::info('Avito API: Token expired, refreshing...', [
+                'integration_id' => $integration->id,
+                'expires_at' => $integration->expires_at,
+            ]);
             $this->refreshIntegrationToken($integration);
+            // Перезагружаем модель после обновления
+            $integration->refresh();
         }
+
+        if (!$integration->access_token) {
+            throw new Exception('Access token is missing');
+        }
+
+        Log::debug('Avito API: Creating authorized client', [
+            'integration_id' => $integration->id,
+            'has_token' => !empty($integration->access_token),
+            'token_length' => strlen($integration->access_token ?? ''),
+        ]);
 
         return Http::withHeaders([
             'Authorization' => 'Bearer ' . $integration->access_token,
