@@ -424,6 +424,15 @@ class AvitoApiService
             $errorData = $response->json();
             $errorMessage = $errorData['error']['message'] ?? $errorData['message'] ?? 'Ошибка создания объявления';
             
+            // Специальная обработка ошибки 404
+            if ($response->status() === 404) {
+                $errorMessage = 'Endpoint не найден. Возможные причины: ' .
+                    '1) Токен не имеет scope items:write - необходимо переавторизоваться; ' .
+                    '2) Неверный endpoint - проверьте документацию Авито API; ' .
+                    '3) API Авито изменил структуру endpoints. ' .
+                    'Ошибка: ' . $errorMessage;
+            }
+            
             // Детальное логирование для диагностики
             Log::error('Avito API: Error creating ad', [
                 'status' => $response->status(),
@@ -445,6 +454,9 @@ class AvitoApiService
                     'images_count' => isset($adData['images']) ? count($adData['images']) : 0,
                     'all_keys' => array_keys($adData),
                 ],
+                'recommendation' => $response->status() === 404 
+                    ? 'Переавторизуйтесь с scope items:write через /admin/avito/integration'
+                    : 'Проверьте структуру данных и права доступа',
             ]);
 
             return [
