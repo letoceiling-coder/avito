@@ -186,11 +186,16 @@ const routes = [
         component: () => import('./pages/auth/ResetPassword.vue'),
         meta: { requiresAuth: false },
     },
+    // ВАЖНО: Callback роут должен быть определен ДО роута /admin
+    // чтобы он обрабатывался первым и не требовал авторизацию
     {
         path: '/admin/avito/callback',
         name: 'admin.avito.callback',
         component: () => import('./pages/admin/AvitoCallback.vue'),
-        meta: { requiresAuth: false },
+        meta: { 
+            requiresAuth: false,
+            public: true, // Дополнительный флаг для явного указания публичного доступа
+        },
     },
     {
         path: '/admin',
@@ -284,13 +289,35 @@ router.beforeEach((to, from, next) => {
     
     // ВАЖНО: Callback роут для Авито должен быть доступен без авторизации
     // Это критично для OAuth flow, так как callback может быть вызван из popup окна
-    if (to.path === '/admin/avito/callback') {
-        console.log('✅ Avito callback route - allowing access without auth');
+    // Проверяем несколькими способами для надежности
+    const isCallbackRoute = to.path === '/admin/avito/callback' || 
+                           to.name === 'admin.avito.callback' ||
+                           to.meta.public === true ||
+                           (to.meta.requiresAuth === false && to.path.includes('/admin/avito/callback'));
+    
+    if (isCallbackRoute) {
+        console.log('✅ Avito callback route detected - allowing access without auth', {
+            path: to.path,
+            name: to.name,
+            fullPath: to.fullPath,
+            meta: to.meta,
+            isAuthenticated: isAuthenticated,
+            matched: to.matched.map(m => ({ path: m.path, name: m.name }))
+        });
+        // Явно игнорируем requiresAuth для этого роута
         next();
         return;
     }
     
-    if (to.meta.requiresAuth && !isAuthenticated) {
+    // Проверяем requiresAuth только если это не публичный роут
+    if (to.meta.requiresAuth && !isAuthenticated && !to.meta.public) {
+        console.log('🔒 Route requires auth, redirecting to login', {
+            path: to.path,
+            name: to.name,
+            requiresAuth: to.meta.requiresAuth,
+            isAuthenticated: isAuthenticated,
+            public: to.meta.public
+        });
         next('/login');
     } else if ((to.path === '/login' || to.path === '/register') && isAuthenticated) {
         next('/admin');
