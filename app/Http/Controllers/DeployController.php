@@ -104,9 +104,9 @@ class DeployController extends Controller
 
             // Шаг 2: Установка PHP зависимостей
             $log[] = "Шаг 2: Установка PHP зависимостей...";
-            $composerPath = $this->findComposer();
-            $log[] = "Используется composer: {$composerPath}";
             $log[] = "Текущая директория: " . getcwd();
+            $log[] = "Путь к .env: " . base_path('.env');
+            $log[] = ".env существует: " . (file_exists(base_path('.env')) ? 'да' : 'нет');
             
             // Показываем информацию о HOME
             $homeFromEnv = $this->getHomeFromEnv();
@@ -114,6 +114,9 @@ class DeployController extends Controller
             $log[] = "HOME из .env: " . ($homeFromEnv ?: 'не найден');
             $log[] = "HOME из getenv: " . ($homeFromGetenv ?: 'не установлен');
             $log[] = "Пользователь: " . get_current_user();
+            
+            $composerPath = $this->findComposer();
+            $log[] = "Используется composer: {$composerPath}";
             
             // Выполняем команду composer (мы уже в корне проекта)
             // Используем параметры из требований: --no-interaction --prefer-dist --optimize-autoloader
@@ -359,6 +362,11 @@ class DeployController extends Controller
             $homeDir = getenv('HOME');
         }
         
+        // Логируем для отладки (будет видно в выводе развертывания)
+        $debugInfo = [];
+        $debugInfo[] = "Поиск composer...";
+        $debugInfo[] = "HOME из .env: " . ($homeDir ?: 'не найден');
+        
         if (!$homeDir) {
             // Для Windows
             $homeDir = getenv('HOMEDRIVE') . getenv('HOMEPATH');
@@ -478,8 +486,15 @@ class DeployController extends Controller
         $envFile = base_path('.env');
         if (file_exists($envFile)) {
             $envContent = file_get_contents($envFile);
-            if (preg_match('/^HOME=(.+)$/m', $envContent, $matches)) {
-                return trim($matches[1]);
+            // Ищем HOME= в начале строки (может быть пробелы перед =)
+            // Поддерживаем формат: HOME=value или HOME = value
+            if (preg_match('/^HOME\s*=\s*(.+)$/m', $envContent, $matches)) {
+                $home = trim($matches[1]);
+                // Убираем кавычки, если есть
+                $home = trim($home, '"\'');
+                // Убираем комментарии после значения
+                $home = preg_replace('/\s*#.*$/', '', $home);
+                return trim($home);
             }
         }
         return null;
