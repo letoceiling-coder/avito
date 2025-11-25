@@ -234,11 +234,13 @@ class AvitoApiService
             
             $client = $this->getAuthorizedClient($integration);
             $response = $client->get($url, $params);
+            $finalUrl = $url;
             
             // Если получили 404, попробуем альтернативный endpoint
             if ($response->status() === 404) {
                 Log::warning('Avito API: Standard endpoint returned 404, trying alternative', [
                     'original_url' => $url,
+                    'error' => $response->json(),
                 ]);
                 
                 // Альтернативный вариант: без userId в пути (используем текущий аккаунт)
@@ -248,19 +250,21 @@ class AvitoApiService
                 ]);
                 
                 $response = $client->get($alternativeUrl, $params);
+                $finalUrl = $alternativeUrl;
                 
                 // Если и это не работает, попробуем с userId как query параметр
                 if ($response->status() === 404) {
                     Log::warning('Avito API: Alternative endpoint also returned 404, trying with userId as query param');
-                    $params['user_id'] = $userId;
-                    $response = $client->get($alternativeUrl, $params);
+                    $paramsWithUserId = array_merge($params, ['user_id' => $userId]);
+                    $response = $client->get($alternativeUrl, $paramsWithUserId);
                 }
             }
 
             Log::info('Avito API: Get ads response', [
                 'status' => $response->status(),
                 'successful' => $response->successful(),
-                'url' => $url,
+                'final_url' => $finalUrl,
+                'response_body' => $response->body(),
             ]);
 
             if ($response->successful()) {
