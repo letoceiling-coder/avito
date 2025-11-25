@@ -212,19 +212,23 @@ class AvitoApiService
 
     /**
      * Получить список объявлений
+     * Согласно документации Авито: https://developers.avito.ru/api-catalog
      */
     public function getAds(AvitoIntegration $integration, int $userId, array $params = []): array
     {
         try {
-            $client = $this->getAuthorizedClient($integration);
+            // Проверяем документацию Авито для правильного endpoint
+            // Возможно, нужно использовать другой формат URL
             $url = self::BASE_URL . "/core/v1/accounts/{$userId}/items";
             
             Log::info('Avito API: Getting ads', [
                 'user_id' => $userId,
                 'url' => $url,
                 'params' => $params,
+                'integration_id' => $integration->id,
             ]);
             
+            $client = $this->getAuthorizedClient($integration);
             $response = $client->get($url, $params);
 
             Log::info('Avito API: Get ads response', [
