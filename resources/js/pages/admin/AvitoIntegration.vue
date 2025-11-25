@@ -88,19 +88,27 @@
             </div>
 
             <div class="mt-6 space-y-3">
+                <!-- Кнопка авторизации - показываем всегда, если есть client_id -->
                 <button
-                    v-if="!integration.is_active || !integration.is_token_valid"
+                    v-if="integration.client_id"
                     @click="authorize"
-                    :disabled="loading || !integration.client_id"
-                    class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+                    :disabled="loading"
+                    class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Авторизоваться через OAuth
+                    {{ (integration.is_active && integration.is_token_valid) ? 'Переавторизоваться через OAuth' : 'Авторизоваться через OAuth' }}
                 </button>
+                
+                <!-- Информация о необходимости переавторизации -->
+                <div v-if="integration.is_active && integration.is_token_valid" class="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <p class="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>💡 Совет:</strong> Если вы обновили scope в настройках приложения Авито, нажмите "Переавторизоваться" для получения нового токена с обновленными правами доступа.
+                    </p>
+                </div>
 
                 <button
                     @click="testConnection"
                     :disabled="loading || !integration.is_active"
-                    class="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50"
+                    class="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {{ loading ? 'Проверка...' : 'Тест подключения' }}
                 </button>
