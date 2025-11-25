@@ -459,12 +459,39 @@ class Deploy extends Command
                                 $errorPreview = substr($buildError ?: $buildOutput, 0, 200);
                                 $this->line('   Вывод: ' . $errorPreview);
                                 
-                                // Если ошибка связана с правами на vite, пробуем npx напрямую
+                                // Проверяем тип ошибки
                                 $isPermissionError = strpos($buildError, 'Permission denied') !== false || 
                                                     strpos($buildError, 'vite') !== false ||
                                                     strpos($buildOutput, 'Permission denied') !== false;
                                 
-                                if ($isPermissionError) {
+                                $isHostingRestriction = strpos($buildError, 'Operation not permitted') !== false ||
+                                                       strpos($buildError, 'EPERM') !== false ||
+                                                       strpos($buildError, 'pthread_create') !== false ||
+                                                       strpos($buildError, 'spawnSync') !== false;
+                                
+                                if ($isHostingRestriction) {
+                                    // Ограничения хостинга - не можем выполнить бинарные файлы
+                                    $this->error('   ❌ Хостинг блокирует выполнение бинарных файлов (esbuild/vite)');
+                                    $this->warn('');
+                                    $this->warn('⚠️  Это ограничение безопасности хостинга Beget');
+                                    $this->warn('');
+                                    $this->warn('Решения:');
+                                    $this->line('   1. Соберите фронтенд вручную через SSH:');
+                                    $this->line('      ssh dsc23ytp@dragon.beget.tech');
+                                    $this->line('      cd ~/avito.siteaccess.ru/public_html');
+                                    $this->line('      npm run build');
+                                    $this->warn('');
+                                    $this->line('   2. Или используйте --skip-build для пропуска сборки');
+                                    $this->warn('');
+                                    
+                                    if (!$this->option('force') && !$this->confirm('Продолжить развертывание без сборки фронтенда?', false)) {
+                                        return Command::FAILURE;
+                                    }
+                                    
+                                    $this->warn('⚠️  Сборка фронтенда пропущена из-за ограничений хостинга');
+                                    $this->warn('   Убедитесь, что фронтенд собран вручную через SSH!');
+                                    $buildSuccess = false; // Продолжаем без сборки
+                                } elseif ($isPermissionError) {
                                     $this->warn('   Обнаружена ошибка прав доступа, пробуем npx vite build напрямую...');
                                     
                                     if ($nvmCommand) {
@@ -480,15 +507,30 @@ class Deploy extends Command
                                         $buildSuccess = true;
                                         $this->info('   ✅ Сборка выполнена через npx vite build');
                                     } else {
-                                        $this->error('   ❌ npx vite build также не удался');
-                                        $this->line('   Ошибка: ' . substr($buildError ?: $buildOutput, 0, 300));
-                                        
-                                        if ($hasProd) {
-                                            $this->warn('   Пробуем npm run prod...');
+                                        // Проверяем, не та же ли ошибка хостинга
+                                        if (strpos($buildError, 'Operation not permitted') !== false ||
+                                            strpos($buildError, 'EPERM') !== false ||
+                                            strpos($buildError, 'pthread_create') !== false) {
+                                            $this->error('   ❌ Хостинг блокирует выполнение бинарных файлов');
+                                            $this->warn('   Соберите фронтенд вручную через SSH или используйте --skip-build');
+                                            
+                                            if (!$this->option('force') && !$this->confirm('Продолжить развертывание без сборки фронтенда?', false)) {
+                                                return Command::FAILURE;
+                                            }
+                                            
+                                            $this->warn('⚠️  Сборка фронтенда пропущена');
+                                            $buildSuccess = false;
                                         } else {
-                                            // Если prod нет, показываем полную ошибку
-                                            $this->error('   Ошибка сборки:');
-                                            $this->line($buildError ?: $buildOutput);
+                                            $this->error('   ❌ npx vite build также не удался');
+                                            $this->line('   Ошибка: ' . substr($buildError ?: $buildOutput, 0, 300));
+                                            
+                                            if ($hasProd) {
+                                                $this->warn('   Пробуем npm run prod...');
+                                            } else {
+                                                // Если prod нет, показываем полную ошибку
+                                                $this->error('   Ошибка сборки:');
+                                                $this->line($buildError ?: $buildOutput);
+                                            }
                                         }
                                     }
                                 } elseif ($hasProd) {
@@ -515,26 +557,52 @@ class Deploy extends Command
                             if ($result->successful()) {
                                 $buildSuccess = true;
                             } else {
-                                $this->error('❌ Ошибка при сборке фронтенда');
-                                $this->error($result->errorOutput() ?: $result->output());
-                                $this->warn('');
-                                $this->warn('Попробуйте выполнить вручную:');
-                                if ($hasBuild) {
-                                    $this->line('   npm run build');
+                                $prodError = $result->errorOutput() ?: $result->output();
+                                $isHostingRestriction = strpos($prodError, 'Operation not permitted') !== false ||
+                                                       strpos($prodError, 'EPERM') !== false ||
+                                                       strpos($prodError, 'pthread_create') !== false;
+                                
+                                if ($isHostingRestriction) {
+                                    $this->error('❌ Хостинг блокирует выполнение бинарных файлов');
+                                    $this->warn('   Соберите фронтенд вручную через SSH или используйте --skip-build');
+                                    
+                                    if (!$this->option('force') && !$this->confirm('Продолжить развертывание без сборки фронтенда?', false)) {
+                                        return Command::FAILURE;
+                                    }
+                                    
+                                    $this->warn('⚠️  Сборка фронтенда пропущена из-за ограничений хостинга');
+                                    $buildSuccess = false;
+                                } else {
+                                    $this->error('❌ Ошибка при сборке фронтенда');
+                                    $this->error($prodError);
+                                    $this->warn('');
+                                    $this->warn('Попробуйте выполнить вручную:');
+                                    if ($hasBuild) {
+                                        $this->line('   npm run build');
+                                    }
+                                    if ($hasProd) {
+                                        $this->line('   npm run prod');
+                                    }
+                                    return Command::FAILURE;
                                 }
-                                if ($hasProd) {
-                                    $this->line('   npm run prod');
-                                }
-                                return Command::FAILURE;
                             }
                         } elseif (!$buildSuccess) {
-                            // Если build не удался и prod нет
-                            $this->error('❌ Ошибка при сборке фронтенда');
-                            $this->error($buildError ?: $buildOutput);
-                            $this->warn('');
-                            $this->warn('Попробуйте выполнить вручную:');
-                            $this->line('   npm run build');
-                            return Command::FAILURE;
+                            // Если build не удался и prod нет, проверяем, не была ли уже обработана ошибка хостинга
+                            // (если buildSuccess был установлен в false из-за ограничений хостинга, продолжаем)
+                            $isHostingRestriction = strpos($buildError, 'Operation not permitted') !== false ||
+                                                   strpos($buildError, 'EPERM') !== false ||
+                                                   strpos($buildError, 'pthread_create') !== false;
+                            
+                            if (!$isHostingRestriction) {
+                                // Обычная ошибка сборки
+                                $this->error('❌ Ошибка при сборке фронтенда');
+                                $this->error($buildError ?: $buildOutput);
+                                $this->warn('');
+                                $this->warn('Попробуйте выполнить вручную:');
+                                $this->line('   npm run build');
+                                return Command::FAILURE;
+                            }
+                            // Если isHostingRestriction, то ошибка уже обработана выше, продолжаем
                         }
                     }
                 } catch (\Exception $e) {
