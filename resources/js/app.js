@@ -282,6 +282,14 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
     const isAuthenticated = store.getters.isAuthenticated;
     
+    // ВАЖНО: Callback роут для Авито должен быть доступен без авторизации
+    // Это критично для OAuth flow, так как callback может быть вызван из popup окна
+    if (to.path === '/admin/avito/callback') {
+        console.log('✅ Avito callback route - allowing access without auth');
+        next();
+        return;
+    }
+    
     if (to.meta.requiresAuth && !isAuthenticated) {
         next('/login');
     } else if ((to.path === '/login' || to.path === '/register') && isAuthenticated) {
