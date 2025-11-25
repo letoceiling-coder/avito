@@ -244,9 +244,14 @@ class AvitoIntegrationController extends Controller
         // Документация: https://developers.avito.ru/api-catalog/auth/documentation
         // Формат: scope1,scope2,scope3 (через запятую, без пробелов)
         // Пример из документации: messenger:read,messenger:write
-        // Для работы с объявлениями используем items:read и items:write
-        // Если эти scope не работают, можно попробовать items:info
-        $scope = 'items:read,items:write'; // Формат с запятыми согласно документации
+        // 
+        // Доступные scope для работы с объявлениями (из документации):
+        // - items:info - Получение информации об объявлениях
+        // - items:apply_vas - Применение дополнительных услуг
+        // 
+        // Примечание: items:read и items:write могут не существовать
+        // Используем items:info согласно официальной документации
+        $scope = 'items:info'; // Используем items:info согласно документации
         $params['scope'] = $scope;
         
         $authUrl = 'https://www.avito.ru/oauth?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
