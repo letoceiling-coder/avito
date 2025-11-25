@@ -33,9 +33,20 @@ class DeployController extends Controller
         $log = [];
         $log[] = "=== Начало развертывания ===";
         $log[] = "Время: " . now()->toDateTimeString();
+        
+        // Переходим в корень проекта для выполнения команд
+        $basePath = base_path();
+        $log[] = "Рабочая директория: {$basePath}";
         $log[] = "";
 
         try {
+            // Сохраняем текущую директорию
+            $originalDir = getcwd();
+            
+            // Переходим в корень проекта
+            if (!chdir($basePath)) {
+                throw new \Exception("Не удалось перейти в директорию проекта: {$basePath}");
+            }
             // Шаг 1: Обновление из git
             $log[] = "Шаг 1: Обновление кода из git...";
             
@@ -138,28 +149,32 @@ class DeployController extends Controller
             // Шаг 9: Установка прав доступа
             $log[] = "Шаг 9: Установка прав доступа...";
             
-            // Используем абсолютные пути
-            $basePath = base_path();
-            $storagePath = $basePath . '/storage';
-            $cachePath = $basePath . '/bootstrap/cache';
+            // Используем относительные пути, так как мы уже в корне проекта
+            $currentDir = getcwd();
+            $log[] = "Текущая директория: {$currentDir}";
             
-            if (is_dir($storagePath)) {
-                $this->executeCommand("chmod -R 755 {$storagePath} 2>&1", $log);
+            if (is_dir('storage')) {
+                $this->executeCommand("chmod -R 755 storage 2>&1", $log);
                 $log[] = "Права для storage установлены";
             } else {
-                $log[] = "Предупреждение: директория storage не найдена";
+                $log[] = "Предупреждение: директория storage не найдена в {$currentDir}";
             }
             
-            if (is_dir($cachePath)) {
-                $this->executeCommand("chmod -R 755 {$cachePath} 2>&1", $log);
+            if (is_dir('bootstrap/cache')) {
+                $this->executeCommand("chmod -R 755 bootstrap/cache 2>&1", $log);
                 $log[] = "Права для bootstrap/cache установлены";
             } else {
-                $log[] = "Предупреждение: директория bootstrap/cache не найдена";
+                $log[] = "Предупреждение: директория bootstrap/cache не найдена в {$currentDir}";
             }
             
             $log[] = "";
 
             $log[] = "=== Развертывание завершено успешно! ===";
+
+            // Возвращаемся в исходную директорию
+            if (isset($originalDir)) {
+                chdir($originalDir);
+            }
 
             Log::info('Deploy completed successfully', [
                 'timestamp' => now()->toDateTimeString(),
@@ -174,6 +189,11 @@ class DeployController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
+            // Возвращаемся в исходную директорию в случае ошибки
+            if (isset($originalDir)) {
+                @chdir($originalDir);
+            }
+            
             $log[] = "";
             $log[] = "=== ОШИБКА ===";
             $log[] = "Сообщение: " . $e->getMessage();
