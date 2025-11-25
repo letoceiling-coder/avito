@@ -58,7 +58,7 @@
                 <div class="flex justify-between items-start">
                     <div class="flex-1">
                         <h3 class="text-lg font-semibold mb-2">{{ ad.title }}</h3>
-                        <p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ ad.description }}</p>
+                        <p v-if="ad.description" class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ ad.description }}</p>
                         
                         <div class="flex flex-wrap gap-4 text-sm">
                             <div>
@@ -80,9 +80,13 @@
                                 <span class="text-muted-foreground">Цена:</span>
                                 <span class="ml-1 font-medium">{{ formatPrice(ad.price) }} ₽</span>
                             </div>
-                            <div v-if="ad.location">
-                                <span class="text-muted-foreground">Город:</span>
-                                <span class="ml-1 font-medium">{{ ad.location.city || ad.location.city_id }}</span>
+                            <div v-if="ad.address">
+                                <span class="text-muted-foreground">Адрес:</span>
+                                <span class="ml-1 font-medium">{{ ad.address }}</span>
+                            </div>
+                            <div v-if="ad.category">
+                                <span class="text-muted-foreground">Категория:</span>
+                                <span class="ml-1 font-medium">{{ ad.category.name || ad.category.id }}</span>
                             </div>
                         </div>
 
@@ -103,11 +107,11 @@
                         </div>
                     </div>
 
-                    <div class="ml-4">
+                    <div class="ml-4 flex flex-col gap-2">
                         <a
-                            :href="`https://www.avito.ru/${ad.url || ''}`"
+                            :href="ad.url || `https://www.avito.ru/item/${ad.id}`"
                             target="_blank"
-                            class="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
+                            class="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 text-center"
                         >
                             Открыть на Авито
                         </a>
@@ -178,8 +182,23 @@ export default {
                 const response = await axios.get('/api/avito/ads', { params });
 
                 if (response.data.success) {
-                    this.ads = response.data.data.items || [];
-                    this.pagination = response.data.data.pagination || null;
+                    // Структура ответа от Авито API:
+                    // { "meta": {...}, "resources": [...] }
+                    // Объявления находятся в поле "resources"
+                    const data = response.data.data || {};
+                    this.ads = data.resources || data.items || [];
+                    
+                    // Пагинация из meta
+                    if (data.meta) {
+                        this.pagination = {
+                            current_page: data.meta.page || 1,
+                            per_page: data.meta.per_page || 20,
+                            last_page: Math.ceil((data.meta.total || this.ads.length) / (data.meta.per_page || 20)),
+                            total: data.meta.total || this.ads.length,
+                        };
+                    } else {
+                        this.pagination = null;
+                    }
                 } else {
                     this.ads = [];
                     console.error('Ошибка загрузки объявлений:', response.data.error);
