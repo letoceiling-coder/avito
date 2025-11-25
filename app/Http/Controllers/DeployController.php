@@ -38,10 +38,20 @@ class DeployController extends Controller
         try {
             // Шаг 1: Обновление из git
             $log[] = "Шаг 1: Обновление кода из git...";
-            $gitPull = $this->executeCommand('git pull origin master 2>&1', $log);
-            if ($gitPull['code'] !== 0) {
-                // Попробуем ветку main
-                $gitPull = $this->executeCommand('git pull origin main 2>&1', $log);
+            
+            // Проверяем, является ли директория git репозиторием
+            if (!is_dir('.git')) {
+                $log[] = "Предупреждение: Директория не является git репозиторием";
+                $log[] = "Пропуск обновления из git";
+            } else {
+                $gitPull = $this->executeCommand('git pull origin master 2>&1', $log);
+                if ($gitPull['code'] !== 0) {
+                    // Попробуем ветку main
+                    $gitPull = $this->executeCommand('git pull origin main 2>&1', $log);
+                    if ($gitPull['code'] !== 0) {
+                        $log[] = "Предупреждение: Не удалось обновить код из git (возможно, нет изменений или проблемы с подключением)";
+                    }
+                }
             }
             $log[] = "";
 
@@ -150,18 +160,31 @@ class DeployController extends Controller
             $log[] = "Сообщение: " . $e->getMessage();
             $log[] = "Файл: " . $e->getFile();
             $log[] = "Строка: " . $e->getLine();
+            
+            // Добавляем trace только в режиме отладки
+            if (config('app.debug')) {
+                $log[] = "Trace: " . $e->getTraceAsString();
+            }
 
             Log::error('Deploy failed', [
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
                 'ip' => $request->ip()
             ]);
 
+            $errorMessage = config('app.debug') 
+                ? $e->getMessage() . ' в ' . $e->getFile() . ':' . $e->getLine()
+                : 'Ошибка при развертывании. Проверьте логи на сервере.';
+
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка при развертывании: ' . $e->getMessage(),
+                'message' => $errorMessage,
                 'output' => implode("\n", $log),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ], 500);
         }
     }

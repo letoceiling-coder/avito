@@ -127,12 +127,34 @@ class SetDeploy extends Command
             } else {
                 $this->error('Ошибка при отправке запроса на развертывание!');
                 $this->line('Статус: ' . $response->status());
-                $this->line('Ответ: ' . $response->body());
+                
+                // Пытаемся получить JSON ответ с деталями ошибки
+                $responseData = $response->json();
+                if ($responseData && isset($responseData['message'])) {
+                    $this->line('Сообщение: ' . $responseData['message']);
+                    if (isset($responseData['error'])) {
+                        $this->line('Ошибка: ' . $responseData['error']);
+                    }
+                    if (isset($responseData['output'])) {
+                        $this->line("\nВывод сервера:");
+                        $this->line($responseData['output']);
+                    }
+                } else {
+                    // Если не JSON, выводим тело ответа
+                    $body = $response->body();
+                    if (strlen($body) > 0) {
+                        $this->line('Ответ сервера: ' . substr($body, 0, 500));
+                        if (strlen($body) > 500) {
+                            $this->line('... (ответ обрезан)');
+                        }
+                    }
+                }
                 
                 Log::error('Deploy request failed', [
                     'url' => $deployUrl,
                     'status' => $response->status(),
-                    'response' => $response->body()
+                    'response' => $response->body(),
+                    'headers' => $response->headers()
                 ]);
                 
                 return 1;
