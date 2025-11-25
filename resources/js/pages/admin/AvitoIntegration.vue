@@ -477,13 +477,25 @@ export default {
                                 });
                             } else {
                                 console.warn('⚠️ No code found in localStorage. Callback page may not have loaded.');
+                                console.warn('💡 Возможные причины:');
+                                console.warn('   1. Окно было закрыто до того, как Авито сделал редирект на callback URL');
+                                console.warn('   2. Авито показал ошибку "Что-то пошло не так"');
+                                console.warn('   3. Callback страница не успела загрузиться');
+                                console.warn('💡 Попробуйте авторизоваться снова и НЕ закрывайте окно авторизации');
                                 
                                 // Показываем подробное сообщение об ошибке
                                 Swal.fire({
                                     icon: 'error',
                                     title: 'Авторизация не завершена',
                                     html: `
-                                        <p>Окно авторизации было закрыто до завершения процесса.</p>
+                                        <p style="margin-bottom: 15px;">Окно авторизации было закрыто до завершения процесса.</p>
+                                        <div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 15px; margin: 15px 0; text-align: left;">
+                                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">⚠️ ВАЖНО:</p>
+                                            <p style="margin: 0; color: #856404;">
+                                                <strong>НЕ ЗАКРЫВАЙТЕ</strong> окно авторизации вручную! 
+                                                Оно должно закрыться автоматически после успешной авторизации.
+                                            </p>
+                                        </div>
                                         <div style="background: #f8f9fa; border-left: 4px solid #dc3545; padding: 15px; margin: 15px 0; text-align: left;">
                                             <p style="margin: 0 0 10px 0; font-weight: bold;">Возможные причины:</p>
                                             <ol style="margin: 0; padding-left: 20px;">
@@ -496,15 +508,16 @@ export default {
                                         <ol style="text-align: left; margin-top: 10px;">
                                             <li>Попробуйте авторизоваться снова</li>
                                             <li><strong>НЕ ЗАКРЫВАЙТЕ</strong> окно авторизации вручную</li>
-                                            <li>Дождитесь автоматического закрытия окна</li>
+                                            <li>Дождитесь, пока Авито сделает редирект на callback страницу</li>
+                                            <li>Дождитесь автоматического закрытия окна (это займет несколько секунд)</li>
                                             <li>Если видите ошибку в окне Авито, проверьте Redirect URI в настройках приложения</li>
                                         </ol>
                                     `,
                                     confirmButtonText: 'Попробовать снова',
-                                    width: '600px',
+                                    width: '700px',
                                 });
                             }
-                        }, 2000); // Даем 2 секунды на обработку
+                        }, 3000); // Увеличено с 2 до 3 секунд на обработку
                     } else {
                         // Проверяем URL окна авторизации (если доступно)
                         try {
