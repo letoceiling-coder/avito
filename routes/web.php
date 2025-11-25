@@ -3,7 +3,8 @@
 use App\Http\Controllers\DeployController;
 use Illuminate\Support\Facades\Route;
 
-// Роут для развертывания (должен быть перед catch-all)
+// Роут для развертывания (без CSRF, защита через DEPLOY_TOKEN)
+// Исключен из CSRF в bootstrap/app.php
 Route::post('/deploy', [DeployController::class, 'deploy']);
 
 // Единая точка входа для SPA
