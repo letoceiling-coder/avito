@@ -51,13 +51,15 @@ export default {
             const errorDescription = urlParams.get('error_description');
             const state = urlParams.get('state');
 
-            console.log('Callback received:', { 
-                code: code ? 'present' : 'missing', 
+            console.log('🔔 Callback page loaded:', { 
+                code: code ? 'present (' + code.substring(0, 10) + '...)' : 'missing', 
                 error, 
                 errorDescription,
                 state,
                 fullUrl: window.location.href,
-                search: window.location.search
+                search: window.location.search,
+                hasOpener: !!window.opener,
+                openerClosed: window.opener ? window.opener.closed : 'N/A'
             });
 
             if (error) {
@@ -92,12 +94,36 @@ export default {
                         console.log('Sending message to opener with origin:', targetOrigin);
                         console.log('Message data:', { type: 'avito-auth-success', code: code ? 'present' : 'missing' });
                         
-                        window.opener.postMessage({
+                        const message = {
                             type: 'avito-auth-success',
                             code: code,
-                        }, targetOrigin);
+                        };
                         
-                        console.log('✓ Message sent to opener successfully');
+                        console.log('📤 Sending message to opener:', {
+                            targetOrigin: targetOrigin,
+                            messageType: message.type,
+                            hasCode: !!message.code,
+                            codeLength: message.code ? message.code.length : 0
+                        });
+                        
+                        window.opener.postMessage(message, targetOrigin);
+                        
+                        console.log('✅ Message sent to opener successfully');
+                        
+                        // Отправляем сообщение несколько раз на случай, если первое не дошло
+                        setTimeout(() => {
+                            if (window.opener && !window.opener.closed) {
+                                console.log('📤 Resending message (retry 1)');
+                                window.opener.postMessage(message, targetOrigin);
+                            }
+                        }, 500);
+                        
+                        setTimeout(() => {
+                            if (window.opener && !window.opener.closed) {
+                                console.log('📤 Resending message (retry 2)');
+                                window.opener.postMessage(message, targetOrigin);
+                            }
+                        }, 1000);
                         
                         // Показываем успех перед закрытием
                         this.processing = false;

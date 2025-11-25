@@ -332,6 +332,23 @@ export default {
                         keys: Object.keys(event.data)
                     });
                     
+                    // Игнорируем служебные сообщения от Авито (COUNTER_SCRIPT_READY и т.д.)
+                    // Эти сообщения не содержат код авторизации
+                    if (event.data.type && 
+                        event.data.type !== 'avito-auth-success' && 
+                        event.data.type !== 'avito-auth-error' &&
+                        !event.data.code) {
+                        console.log('⚠️ Ignoring service message from Avito:', event.data.type);
+                        return;
+                    }
+                    
+                    // Важно: код авторизации должен приходить от callback страницы (нашего домена)
+                    // Если сообщение от Авито, но нет кода - это служебное сообщение
+                    if (isAvitoDomain && !event.data.code && event.data.type !== 'avito-auth-error') {
+                        console.log('⚠️ Service message from Avito (no code), ignoring');
+                        return;
+                    }
+                    
                     // Обрабатываем успешную авторизацию
                     if (event.data.type === 'avito-auth-success' && event.data.code) {
                         console.log('✅ Auth success, code received:', event.data.code.substring(0, 10) + '...');
