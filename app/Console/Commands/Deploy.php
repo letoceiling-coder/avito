@@ -379,66 +379,157 @@ class Deploy extends Command
                 
                 $buildOutput = '';
                 $buildError = '';
+                $buildSuccess = false;
                 
                 try {
-                    if ($nvmCommand) {
-                        $result = Process::run("{$nvmCommand} && npm run build");
+                    // Читаем package.json для проверки доступных скриптов
+                    $packageJson = json_decode(file_get_contents(base_path('package.json')), true);
+                    $hasBuild = isset($packageJson['scripts']['build']);
+                    $hasProd = isset($packageJson['scripts']['prod']);
+                    
+                    if (!$hasBuild && !$hasProd) {
+                        $this->warn('⚠️  Скрипты build и prod не найдены в package.json');
+                        $this->warn('   Пропуск сборки фронтенда');
                     } else {
-                        $result = Process::run('npm run build');
-                    }
-                    
-                    $buildOutput = $result->output();
-                    $buildError = $result->errorOutput();
-                    
-                    if (!$result->successful()) {
-                        // Пробуем npm run prod
-                        $this->warn('⚠️  npm run build не удался, пробуем npm run prod...');
-                        if ($nvmCommand) {
-                            $result = Process::run("{$nvmCommand} && npm run prod");
-                        } else {
-                            $result = Process::run('npm run prod');
+                        // Пробуем сначала build, потом prod (если есть и build не удался)
+                        if ($hasBuild) {
+                            if ($nvmCommand) {
+                                $result = Process::run("{$nvmCommand} && npm run build");
+                            } else {
+                                $result = Process::run('npm run build');
+                            }
+                            
+                            $buildOutput = $result->output();
+                            $buildError = $result->errorOutput();
+                            
+                            if ($result->successful()) {
+                                $buildSuccess = true;
+                            } else {
+                                $this->warn('⚠️  npm run build не удался');
+                                $this->line('   Вывод: ' . substr($buildError ?: $buildOutput, 0, 200));
+                                if ($hasProd) {
+                                    $this->warn('   Пробуем npm run prod...');
+                                } else {
+                                    // Если prod нет, показываем полную ошибку
+                                    $this->error('   Ошибка сборки:');
+                                    $this->line($buildError ?: $buildOutput);
+                                }
+                            }
                         }
                         
-                        if (!$result->successful()) {
+                        // Если build не удался и есть prod, пробуем prod
+                        if (!$buildSuccess && $hasProd) {
+                            if ($nvmCommand) {
+                                $result = Process::run("{$nvmCommand} && npm run prod");
+                            } else {
+                                $result = Process::run('npm run prod');
+                            }
+                            
+                            $buildOutput = $result->output();
+                            $buildError = $result->errorOutput();
+                            
+                            if ($result->successful()) {
+                                $buildSuccess = true;
+                            } else {
+                                $this->error('❌ Ошибка при сборке фронтенда');
+                                $this->error($result->errorOutput() ?: $result->output());
+                                $this->warn('');
+                                $this->warn('Попробуйте выполнить вручную:');
+                                if ($hasBuild) {
+                                    $this->line('   npm run build');
+                                }
+                                if ($hasProd) {
+                                    $this->line('   npm run prod');
+                                }
+                                return Command::FAILURE;
+                            }
+                        } elseif (!$buildSuccess) {
+                            // Если build не удался и prod нет
                             $this->error('❌ Ошибка при сборке фронтенда');
-                            $this->error($result->errorOutput() ?: $result->output());
+                            $this->error($buildError ?: $buildOutput);
                             $this->warn('');
                             $this->warn('Попробуйте выполнить вручную:');
-                            $this->line('   npm run build или npm run prod');
+                            $this->line('   npm run build');
                             return Command::FAILURE;
                         }
                     }
                 } catch (\Exception $e) {
-                    $command = $nvmCommand 
-                        ? ['bash', '-c', "{$nvmCommand} && npm run build"]
-                        : ['npm', 'run', 'build'];
-                    
-                    $process = new SymfonyProcess($command);
-                    $process->setTimeout(600);
-                    $process->run();
-                    
-                    $buildOutput = $process->getOutput();
-                    $buildError = $process->getErrorOutput();
-                    
-                    if (!$process->isSuccessful()) {
-                        // Пробуем npm run prod
-                        $this->warn('⚠️  npm run build не удался, пробуем npm run prod...');
-                        $command = $nvmCommand 
-                            ? ['bash', '-c', "{$nvmCommand} && npm run prod"]
-                            : ['npm', 'run', 'prod'];
+                    // Fallback на SymfonyProcess
+                    try {
+                        // Проверяем package.json перед выполнением
+                        $packageJson = json_decode(file_get_contents(base_path('package.json')), true);
+                        $hasBuild = isset($packageJson['scripts']['build']);
+                        $hasProd = isset($packageJson['scripts']['prod']);
                         
-                        $process = new SymfonyProcess($command);
-                        $process->setTimeout(600);
-                        $process->run();
-                        
-                        if (!$process->isSuccessful()) {
-                            $this->error('❌ Ошибка при сборке фронтенда');
-                            $this->error($process->getErrorOutput() ?: $process->getOutput());
-                            $this->warn('');
-                            $this->warn('Попробуйте выполнить вручную:');
-                            $this->line('   npm run build или npm run prod');
-                            return Command::FAILURE;
+                        if (!$hasBuild && !$hasProd) {
+                            $this->warn('⚠️  Скрипты build и prod не найдены в package.json');
+                            $this->warn('   Пропуск сборки фронтенда');
+                            $buildSuccess = false;
+                        } elseif ($hasBuild) {
+                            $command = $nvmCommand 
+                                ? ['bash', '-c', "{$nvmCommand} && npm run build"]
+                                : ['npm', 'run', 'build'];
+                            
+                            $process = new SymfonyProcess($command);
+                            $process->setTimeout(600);
+                            $process->run();
+                            
+                            $buildOutput = $process->getOutput();
+                            $buildError = $process->getErrorOutput();
+                            
+                            if ($process->isSuccessful()) {
+                                $buildSuccess = true;
+                            } elseif ($hasProd) {
+                                // Пробуем prod только если он есть
+                                $this->warn('⚠️  npm run build не удался, пробуем npm run prod...');
+                                $command = $nvmCommand 
+                                    ? ['bash', '-c', "{$nvmCommand} && npm run prod"]
+                                    : ['npm', 'run', 'prod'];
+                                
+                                $process = new SymfonyProcess($command);
+                                $process->setTimeout(600);
+                                $process->run();
+                                
+                                if ($process->isSuccessful()) {
+                                    $buildSuccess = true;
+                                } else {
+                                    $this->error('❌ Ошибка при сборке фронтенда');
+                                    $this->error($process->getErrorOutput() ?: $process->getOutput());
+                                    $this->warn('');
+                                    $this->warn('Попробуйте выполнить вручную:');
+                                    $this->line('   npm run build');
+                                    return Command::FAILURE;
+                                }
+                            } else {
+                                $this->error('❌ Ошибка при сборке фронтенда');
+                                $this->error($buildError ?: $buildOutput);
+                                $this->warn('');
+                                $this->warn('Попробуйте выполнить вручную:');
+                                $this->line('   npm run build');
+                                return Command::FAILURE;
+                            }
                         }
+                    } catch (\Exception $e2) {
+                        $this->error('❌ Ошибка при сборке фронтенда: ' . $e2->getMessage());
+                        $this->warn('');
+                        $this->warn('Попробуйте выполнить вручную:');
+                        $this->line('   npm run build');
+                        return Command::FAILURE;
+                    }
+                }
+                
+                // Проверяем результат только если сборка была выполнена
+                if ($buildSuccess || (!$hasBuild && !$hasProd)) {
+                    // Проверяем, что файлы сборки действительно созданы
+                    $buildDir = base_path('public/build');
+                    $manifestFile = $buildDir . '/.vite/manifest.json';
+                    
+                    if (file_exists($manifestFile) || is_dir($buildDir)) {
+                        $this->info('✅ Фронтенд собран успешно');
+                        $this->line('   Файлы сборки находятся в: public/build');
+                    } elseif ($hasBuild || $hasProd) {
+                        $this->warn('⚠️  Сборка выполнена, но файлы не найдены в public/build');
+                        $this->warn('   Проверьте вывод сборки выше');
                     }
                 }
                 
