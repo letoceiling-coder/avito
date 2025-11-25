@@ -296,13 +296,16 @@ class AvitoAdGeneratorController extends Controller
                 ]);
                 
                 try {
-                    // Обрезаем тему, если она слишком длинная (на всякий случай, хотя поле теперь text)
+                    // Обрезаем тему до разумной длины (1000 символов)
+                    // Это защита на случай, если миграция не применена или поле все еще VARCHAR
                     $generationTopic = $request->topic;
-                    if (strlen($generationTopic) > 65535) {
-                        $generationTopic = substr($generationTopic, 0, 65535);
+                    $maxLength = 1000; // Разумный лимит для темы
+                    if (strlen($generationTopic) > $maxLength) {
+                        $generationTopic = mb_substr($generationTopic, 0, $maxLength, 'UTF-8');
                         Log::warning('Generation topic truncated', [
                             'original_length' => strlen($request->topic),
                             'truncated_length' => strlen($generationTopic),
+                            'max_length' => $maxLength,
                         ]);
                     }
                     
