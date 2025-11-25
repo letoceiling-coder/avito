@@ -279,39 +279,37 @@ export default {
                     console.log('Message received:', {
                         origin: event.origin,
                         data: event.data,
-                        source: event.source
+                        dataType: event.data?.type,
+                        hasCode: !!event.data?.code
                     });
                     
-                    // Проверяем origin - сообщение должно приходить с нашего домена
-                    // (callback страница загружается с нашего сервера)
                     const currentOrigin = window.location.origin;
                     const currentHostname = window.location.hostname;
                     
-                    // Принимаем сообщения с нашего домена (независимо от протокола)
-                    // и также от Авито (на случай, если они отправляют сообщения напрямую)
-                    const isOurDomain = event.origin.includes(currentHostname) || 
-                                       event.origin === currentOrigin ||
-                                       event.origin.replace(/^https?:\/\//, '') === currentHostname;
+                    // Принимаем сообщения от нашего домена
+                    const isOurDomain = event.origin === currentOrigin || 
+                                       event.origin.includes(currentHostname);
                     
                     // Принимаем сообщения от Авито (www.avito.ru, avito.ru)
                     const isAvitoDomain = event.origin.includes('avito.ru');
                     
+                    // ПРИНИМАЕМ сообщения от Авито ИЛИ от нашего домена
+                    const shouldAccept = isOurDomain || isAvitoDomain;
+                    
                     console.log('Origin check:', {
                         eventOrigin: event.origin,
                         currentOrigin: currentOrigin,
-                        currentHostname: currentHostname,
                         isOurDomain: isOurDomain,
                         isAvitoDomain: isAvitoDomain,
-                        willAccept: isOurDomain || isAvitoDomain
+                        shouldAccept: shouldAccept
                     });
                     
-                    // Принимаем сообщения от нашего домена И от Авито
-                    if (!isOurDomain && !isAvitoDomain) {
-                        console.warn('Origin rejected:', event.origin, 'current:', currentOrigin);
+                    if (!shouldAccept) {
+                        console.warn('❌ Origin rejected:', event.origin);
                         return;
                     }
                     
-                    console.log('✓ Origin accepted:', event.origin);
+                    console.log('✅ Origin ACCEPTED:', event.origin);
                     
                     if (event.data && event.data.type === 'avito-auth-success' && event.data.code) {
                         console.log('Auth success, code received');
