@@ -44,6 +44,17 @@ export default {
         console.log('🚀 AvitoCallback component mounted');
         console.log('📍 Current URL:', window.location.href);
         console.log('🔗 Has opener:', !!window.opener);
+        console.log('🌐 Window origin:', window.location.origin);
+        console.log('📋 Query params:', window.location.search);
+        console.log('⏰ Timestamp:', new Date().toISOString());
+        
+        // Проверяем, что компонент действительно загрузился
+        if (!this.$el) {
+            console.error('❌ Component element not found!');
+        } else {
+            console.log('✅ Component element found:', this.$el);
+        }
+        
         this.processCallback();
     },
     methods: {
